@@ -125,7 +125,7 @@ while start_screen:
     screen.fill((0, 0, 0))
     # Image decoration
     screen.blit(pygame.image.load("006-ufo-1.png"), (490, -2))
-    screen.blit(pygame.image.load("005-alien.png"), (220, 535))
+    screen.blit(pygame.image.load("images/005-alien.png"), (220, 535))
     screen.blit(pygame.image.load("001-alien.png"), (660, 535))
     # Instructions
     screen.blit(title_font.render("Feed The Aliens", True, (199, 199, 199)), (220, 15))
