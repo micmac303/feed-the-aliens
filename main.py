@@ -173,7 +173,6 @@ while start:
                     running = True
                     start_screen = False
 
-
     # Reset timer
     temp = pygame.time.get_ticks()
     # Game loop
@@ -365,6 +364,7 @@ while start:
                 start = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
+                    # Reset scores & coordinates & shields
                     player_score = 0
                     player2_score = 0
                     # Player 1
@@ -383,9 +383,18 @@ while start:
                     end_screen = False
 
                     animals.clear()
-
-                    # Summon initial animals
                     for i in range(0, 27):
                         summonAnimal(i)
 
+                    # Load highscores
+                    file = open("Highscore.txt", "r")
+                    highscore = file.readlines()
+                    # Split string in array of score strings
+                    split_scores = highscore[0].split()
+                    # Convert all items to floats
+                    scores = list(map(float, split_scores))
+                    trophy = False
+
+                    chosen_color = colours[random.randint(0, len(colours) - 1)]
+                    print(chosen_color)
 print(current_time/1000)
