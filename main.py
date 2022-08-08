@@ -237,7 +237,7 @@ while running:
         screen.blit(animal["img"], (animal["x_pos"], animal["y_pos"]))
         # pygame.draw.rect(screen, (100, 100, 100), animal["animal_rect"], 4)
         # Summon new animals and delete old animals
-        if animal["image_name"] == "001-eagle.png":
+        if animal["image_name"] == "images/001-eagle.png":
             if animal["x_pos"] > 3200:
                 summonAnimal(0)
                 animals.remove(animal)
