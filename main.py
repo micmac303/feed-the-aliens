@@ -60,14 +60,14 @@ scores = list(map(float, split_scores))
 trophy = False
 
 # Player 1
-player_img = pygame.image.load("001-ufo.png")
+player_img = pygame.image.load("images/001-ufo.png")
 rect = player_img.get_rect()
 playerX = 200
 playerY = 30
 shield = False
 
 # Player 2
-player2_img = pygame.image.load("021-ufo.png")
+player2_img = pygame.image.load("images/021-ufo.png")
 rect2 = player2_img.get_rect()
 player2X = 700
 player2Y = 30
@@ -75,8 +75,8 @@ shield2 = False
 
 # Animal lists
 animals = []
-animal_images = ["003-cow.png", "images/001-hen.png", "003-elephant.png", "002-rabbit.png",
-                 "images/001-bomb.png", "002-truck.png", "003-tiger.png"]
+animal_images = ["images/003-cow.png", "images/001-hen.png", "images/003-elephant.png", "images/002-rabbit.png",
+                 "images/001-bomb.png", "images/002-truck.png", "images/003-tiger.png"]
 rare_animal_images = ["images/001-star.png", "images/001-eagle.png", "images/001-gift.png"]
 
 
@@ -351,7 +351,7 @@ while end_screen:
         file.write(" ".join(str(x) for x in scores))
     if trophy:
         screen.blit(space_font.render("New High Score!", True, (224, 185, 9)), (355, 380))
-        screen.blit(pygame.image.load("001-trophy.png"), (440, 430))
+        screen.blit(pygame.image.load("images/001-trophy.png"), (440, 430))
     # Exit
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
