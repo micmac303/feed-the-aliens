@@ -18,7 +18,7 @@ pygame.init()
 
 # Create the screen
 screen = pygame.display.set_mode((1000, 600))
-pygame.display.set_icon(pygame.image.load("006-ufo-1.png"))
+pygame.display.set_icon(pygame.image.load("images/006-ufo-1.png"))
 pygame.display.set_caption("Feed The Aliens")
 
 # Font
@@ -76,8 +76,8 @@ shield2 = False
 # Animal lists
 animals = []
 animal_images = ["003-cow.png", "001-hen.png", "003-elephant.png", "002-rabbit.png",
-                 "001-bomb.png", "002-truck.png", "003-tiger.png"]
-rare_animal_images = ["001-star.png", "001-eagle.png", "001-gift.png"]
+                 "images/001-bomb.png", "002-truck.png", "003-tiger.png"]
+rare_animal_images = ["images/001-star.png", "images/001-eagle.png", "001-gift.png"]
 
 
 # Create an animal and add it to animals[]
@@ -124,9 +124,9 @@ while start_screen:
     pygame.display.flip()
     screen.fill((0, 0, 0))
     # Image decoration
-    screen.blit(pygame.image.load("006-ufo-1.png"), (490, -2))
+    screen.blit(pygame.image.load("images/006-ufo-1.png"), (490, -2))
     screen.blit(pygame.image.load("images/005-alien.png"), (220, 535))
-    screen.blit(pygame.image.load("001-alien.png"), (660, 535))
+    screen.blit(pygame.image.load("images/001-alien.png"), (660, 535))
     # Instructions
     screen.blit(title_font.render("Feed The Aliens", True, (199, 199, 199)), (220, 15))
     screen.blit(instruction_font.render("Collect the animals to score points", True, (97, 8, 207)), (220, 130))
