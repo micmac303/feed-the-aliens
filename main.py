@@ -2,8 +2,10 @@ import random
 import time
 import pygame
 
-
-# 11.435, 13.15, 14.301, 14.58, 14.718, 14.807, 14.517, 14.562, 14.927, 15.182
+# 29.48 31.9 33.88 34.34 34.64 (to score 200 point)
+# 11.435, 13.15, 14.301, 14.58, 14.718, 14.807, 14.517, 14.562, 14.927  (to score 100 point)
+# 6.52 6.8 6.88 7.04 7.13 (to score 30 point)
+# 1.91 2.44 2.67 3.08 3.44 (to score 1 point)
 
 # To do:
 # flash the score
@@ -32,6 +34,7 @@ title_font = pygame.font.SysFont("impact", 90)
 # Scores
 player_score = 0
 player2_score = 0
+point_goal = 100
 
 # Timer
 clock = pygame.time.Clock()
@@ -178,7 +181,7 @@ while start:
     # Game loop
     while running:
         # Point limit to end game
-        if player_score >= 100 or player2_score >= 100:
+        if player_score >= point_goal or player2_score >= point_goal:
             end_screen = True
             running = False
         # Update display
@@ -241,7 +244,7 @@ while start:
             screen.blit(animal["img"], (animal["x_pos"], animal["y_pos"]))
             # pygame.draw.rect(screen, (100, 100, 100), animal["animal_rect"], 4)
             # Summon new animals and delete old animals
-            if animal["image_name"] == "001-eagle.png":
+            if animal["image_name"] == "images/001-eagle.png":
                 if animal["x_pos"] > 3200:
                     summonAnimal(0)
                     animals.remove(animal)
@@ -314,7 +317,7 @@ while start:
                 animal["x_velocity"] = 5
         # Quit
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+            if event.type == pygame.QUIT:  #or current_time/1000 > 16
                 time.sleep(0.2)
                 running = False
                 start = False
@@ -329,6 +332,7 @@ while start:
         for i in range(0, 5):
             screen.blit(space_font.render(str(i + 1) + "   " + str(scores[i]), True, (224, 185, 9)), (775, 340 + i * 50))
         # Decoration
+        screen.blit(points_font.render("Press r to restart", True, (220, 220, 220)), (10, 550))
         screen.blit(timer_font.render("Time: " + str(round(current_time/1000, 2)), True, (199, 199, 199)), (350, 10))
         screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
         screen.blit(space_font.render("P1: " + str(player_score), True, (240, 90, 26)), (30, 30))
