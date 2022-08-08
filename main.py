@@ -75,9 +75,9 @@ shield2 = False
 
 # Animal lists
 animals = []
-animal_images = ["003-cow.png", "001-hen.png", "003-elephant.png", "002-rabbit.png",
+animal_images = ["003-cow.png", "images/001-hen.png", "003-elephant.png", "002-rabbit.png",
                  "images/001-bomb.png", "002-truck.png", "003-tiger.png"]
-rare_animal_images = ["images/001-star.png", "images/001-eagle.png", "001-gift.png"]
+rare_animal_images = ["images/001-star.png", "images/001-eagle.png", "images/001-gift.png"]
 
 
 # Create an animal and add it to animals[]
