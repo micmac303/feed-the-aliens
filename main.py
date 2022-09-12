@@ -123,7 +123,6 @@ start_screen = True
 end_screen = False
 
 # Game loop
-<<<<<<< HEAD
 while running:
     # Point limit to end game
     if player_score >= 100 or player2_score >= 100:
