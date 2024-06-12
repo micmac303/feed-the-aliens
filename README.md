@@ -1,7 +1,9 @@
 # Feed The Aliens
 Control the alien craft and eat up all the animals to gain points, avoid trucks and bombs.
 
-Chance your luck with the wrapped present surprise item. Grab a shield to protect you from the bombs and cars.
+Chance your luck with the wrapped present surprise item.
+
+Grab a shield to protect you from the bombs and cars.
 
 To run the game simply execute the following command at the command prompt, navigate to feed-the-aliens/main.py
 
