@@ -49,7 +49,7 @@ colours = [(49, 201, 235), (34, 52, 153), (50, 92, 166), (89, 125, 189), (89, 14
 
 # Highscores are player data, not source, so Highscore.txt is not in git.
 # A fresh clone starts from these defaults.
-default_scores = [30.0, 40.0, 50.0, 52.37, 70.0]
+default_scores = [30.0, 40.0, 50.0, 60.0, 70.0]
 
 
 # Space separated list, overwriting any existing scores
