@@ -18,7 +18,7 @@ Two-player local-multiplayer pygame game in a single file, `main.py` (~400 lines
 
 **Screen state machine.** An outer `while start:` loop contains three sequential inner loops — `while start_screen:`, `while running:`, `while end_screen:` — each with its own `pygame.display.flip()` and event handling. Transitions happen by flipping the boolean flags. Quitting sets both the inner flag and `start = False` so the outer loop also exits.
 
-**All game state is module-level globals** (`player_score`, `playerX/Y`, `shield`, `animals`, `chosen_color`, `scores`, `trophy`, ...). Restart is implemented by the `K_r` handler in the end-screen loop manually reassigning every one of them. **Any new piece of game state must be reset there too**, or it will leak across rounds.
+**All game state is module-level globals** (`player_score`, `playerX/Y`, `shield`, `animals`, `chosen_color`, `scores`, `trophy`, ...), but every starting value is written in exactly one place: `newRound()`. It is called once at startup and again from the `K_r` handler on the end screen, which otherwise only flips the three screen flags. **Any new piece of round state belongs in `newRound()`** — set it there rather than at module level, or it will leak across rounds. The screen flags (`start`, `start_screen`, `end_screen`) are deliberately outside it, as loop control rather than round state.
 
 **Frame-rate independence.** `dt = (time.time() - last_time) * 60`, clamped to 1.9 to absorb the slow first frames; every movement/velocity value is multiplied by `dt`. `clock.tick(600)` caps the loop. Movement constants are deliberately asymmetric (left 5.8, right 7.0).
 
