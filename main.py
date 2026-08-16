@@ -123,74 +123,6 @@ start_screen = True
 end_screen = False
 
 # Game loop
-while running:
-    # Point limit to end game
-    if player_score >= 100 or player2_score >= 100:
-        end_screen = True
-        running = False
-    # Update display
-    pygame.display.flip()
-    screen.fill(chosen_color)
-    # Load frame rate
-    dt = time.time() - last_time
-    dt *= 60
-    last_time = time.time()
-    # Slow game on first frames
-    if dt > 2:
-        dt = 1.9
-    # Load time
-    current_time = (pygame.time.get_ticks() - temp)
-    clock.tick(600)
-    # Display scores and time
-    screen.blit(timer_font.render("Time: " + str(round(current_time / 1000, 2)), True, (0, 0, 0)), (320, 30))
-    screen.blit(points_font.render("PLAYER 1", True, (240, 90, 26)), (100, 0))
-    screen.blit(points_font.render("WASD", True, (240, 90, 26)), (100, 30))
-    screen.blit(huge_font.render(str(player_score), True, (181, 91, 53)), (20, 150))
-    screen.blit(points_font.render("PLAYER 2", True, (97, 8, 207)), (780, 0))
-    screen.blit(points_font.render("ARROW KEYS", True, (97, 8, 207)), (780, 30))
-    screen.blit(huge_font.render(str(player2_score), True, (125, 99, 171)), (530, 150))
-    # Load and update hitboxes
-    if shield:
-        rect = pygame.draw.rect(screen, (66, 239, 245), (playerX, playerY, 64, 64), 6)
-    if shield2:
-        rect2 = pygame.draw.rect(screen, (66, 239, 245), (player2X, player2Y, 64, 64), 6)
-    rect = pygame.draw.rect(screen, (0, 0, 0), (playerX + 16, playerY + 16, 32, 32), 0)
-    rect2 = pygame.draw.rect(screen, (0, 0, 0), (player2X + 16, player2Y + 16, 32, 32), 0)
-    # Load players
-    screen.blit(player2_img, (player2X, player2Y))
-    screen.blit(player_img, (playerX, playerY))
-    # Player movement and update players and collide with edge of screen
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_a] and playerX > 0:
-        playerX -= 5.8 * dt
-    if keys[pygame.K_d] and playerX < 936:
-        playerX += 7 * dt
-    if keys[pygame.K_w] and playerY > -8:
-        playerY -= 5.9 * dt
-    if keys[pygame.K_s] and playerY < 544:
-        playerY += 5.9 * dt
-    if keys[pygame.K_LEFT] and player2X > 0:
-        player2X -= 5.8 * dt
-    if keys[pygame.K_RIGHT] and player2X < 936:
-        player2X += 7 * dt
-    if keys[pygame.K_UP] and player2Y > -8:
-        player2Y -= 5.9 * dt
-    if keys[pygame.K_DOWN] and player2Y < 544:
-        player2Y += 5.9 * dt
-    # Load animals individually
-    for animal in animals:
-        # Load hitboxes
-        animal["animal_rect"].x = animal["x_pos"]
-        animal["animal_rect"].y = animal["y_pos"]
-        # Update positions
-        animal["x_pos"] += animal["x_velocity"] * dt
-        # Display animals
-        screen.blit(animal["img"], (animal["x_pos"], animal["y_pos"]))
-        # pygame.draw.rect(screen, (100, 100, 100), animal["animal_rect"], 4)
-        # Summon new animals and delete old animals
-        if animal["image_name"] == "images/001-eagle.png":
-            if animal["x_pos"] > 3200:
-=======
 
 start = True
 while start:
@@ -317,7 +249,6 @@ while start:
                     summonAnimal(0)
                     animals.remove(animal)
             elif animal["x_pos"] > 1100:
->>>>>>> Restart_Functionality
                 summonAnimal(0)
                 animals.remove(animal)
             # Check collision and calculate points
