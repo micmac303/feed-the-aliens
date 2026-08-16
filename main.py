@@ -77,11 +77,54 @@ player_img = pygame.image.load("images/001-ufo.png")
 # Player 2
 player2_img = pygame.image.load("images/021-ufo.png")
 
-# Animal lists
 animals = []
+
+EAGLE = "images/001-eagle.png"
+
+# What each animal does when a player collects it, and how the start screen
+# legend describes it. To add a new animal: add an entry here, add its image to
+# one of the spawn pools below, and give it a spot in legend_layout.
+#   points   - add value to the collecting player's score
+#   obstacle - add value (negative) unless a shield absorbs it
+#   opponent - add value (negative) to the *other* player's score
+#   shield   - grant a single use shield
+#   random   - plus or minus value, a coin flip
+ANIMALS = {
+    "images/003-cow.png": {"effect": "points", "value": 3, "legend": "+3"},
+    "images/001-hen.png": {"effect": "points", "value": 1, "legend": "+1"},
+    "images/003-elephant.png": {"effect": "points", "value": 5, "legend": "+5"},
+    "images/002-rabbit.png": {"effect": "points", "value": 1, "legend": "+1"},
+    EAGLE: {"effect": "points", "value": 8, "legend": "+8"},
+    "images/002-truck.png": {"effect": "obstacle", "value": -5, "legend": "-5"},
+    "images/001-bomb.png": {"effect": "obstacle", "value": -2, "legend": "-2"},
+    "images/003-tiger.png": {"effect": "opponent", "value": -3, "legend": "-3 to opponent"},
+    "images/001-star.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
+    "images/001-gift.png": {"effect": "random", "value": 10, "legend": "Random +10 / -10"},
+}
+
+# Spawn pools: rare animals come up on a 1 in 8 roll in summonAnimal()
 animal_images = ["images/003-cow.png", "images/001-hen.png", "images/003-elephant.png", "images/002-rabbit.png",
                  "images/001-bomb.png", "images/002-truck.png", "images/003-tiger.png"]
-rare_animal_images = ["images/001-star.png", "images/001-eagle.png", "images/001-gift.png"]
+rare_animal_images = ["images/001-star.png", EAGLE, "images/001-gift.png"]
+
+# A spawnable animal with no entry above would silently score nothing
+for name in animal_images + rare_animal_images:
+    assert name in ANIMALS, "no ANIMALS entry for " + name
+
+# Where each animal sits on the start screen legend: (image, image position,
+# label position). The label text itself comes from ANIMALS.
+legend_layout = [
+    (EAGLE, (30, 30), (100, 40)),
+    ("images/003-elephant.png", (30, 130), (100, 140)),
+    ("images/003-cow.png", (30, 230), (100, 240)),
+    ("images/001-hen.png", (30, 330), (100, 340)),
+    ("images/002-rabbit.png", (30, 430), (100, 440)),
+    ("images/002-truck.png", (910, 30), (860, 40)),
+    ("images/001-bomb.png", (910, 130), (860, 140)),
+    ("images/001-gift.png", (340, 330), (420, 345)),
+    ("images/003-tiger.png", (340, 400), (420, 410)),
+    ("images/001-star.png", (340, 470), (420, 480)),
+]
 
 
 # Create an animal and add it to animals[]
@@ -103,16 +146,38 @@ def summonAnimal(i_arg):
     animals.append(animal_arg)
 
 
-# Check for star, update star and score
-def checkForStar(shield_active, score, obstacle):
+# A shield absorbs one hit instead of the player taking the penalty
+def checkForStar(shield_active, score, penalty):
     if shield_active:
         shield_active = False
     else:
-        if obstacle == "truck":
-            score -= 5
-        elif obstacle == "bomb":
-            score -= 2
+        score += penalty
     return shield_active, score
+
+
+# Apply one collected animal to the collecting player. Returns the updated
+# (score, opponent_score, shield_active) - callers must reassign all three.
+def collectAnimal(image_name, score, opponent_score, shield_active):
+    animal_type = ANIMALS[image_name]
+    effect = animal_type["effect"]
+    value = animal_type["value"]
+
+    if effect == "points":
+        score += value
+    elif effect == "obstacle":
+        shield_active, score = checkForStar(shield_active, score, value)
+    elif effect == "opponent":
+        opponent_score += value
+    elif effect == "shield":
+        shield_active = True
+    elif effect == "random":
+        # Calculate random value of present
+        if random.randint(0, 1) == 0:
+            score -= value
+        else:
+            score += value
+
+    return score, opponent_score, shield_active
 
 
 # Reset everything that belongs to a single round. Called once at startup and
@@ -187,27 +252,11 @@ while start:
         for i in range(0, 5):
             screen.blit(space_font.render(str(i + 1) + "   " + str(scores[i]), True, (224, 185, 9)), (720, 340 + i * 50))
         screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (720, 280))
-        # Animal pictures
-        screen.blit(pygame.image.load(rare_animal_images[1]), (30, 30))
-        screen.blit(points_font.render("+8", True, (199, 199, 199)), (100, 40))
-        screen.blit(pygame.image.load(animal_images[2]), (30, 130))
-        screen.blit(points_font.render("+5", True, (199, 199, 199)), (100, 140))
-        screen.blit(pygame.image.load(animal_images[0]), (30, 230))
-        screen.blit(points_font.render("+3", True, (199, 199, 199)), (100, 240))
-        screen.blit(pygame.image.load(animal_images[1]), (30, 330))
-        screen.blit(points_font.render("+1", True, (199, 199, 199)), (100, 340))
-        screen.blit(pygame.image.load(animal_images[3]), (30, 430))
-        screen.blit(points_font.render("+1", True, (199, 199, 199)), (100, 440))
-        screen.blit(pygame.image.load(animal_images[5]), (910, 30))
-        screen.blit(points_font.render("-5", True, (199, 199, 199)), (860, 40))
-        screen.blit(pygame.image.load(animal_images[4]), (910, 130))
-        screen.blit(points_font.render("-2", True, (199, 199, 199)), (860, 140))
-        screen.blit(pygame.image.load(rare_animal_images[2]), (340, 330))
-        screen.blit(points_font.render("Random +10 / -10", True, (199, 199, 199)), (420, 345))
-        screen.blit(pygame.image.load(animal_images[6]), (340, 400))
-        screen.blit(points_font.render("-3 to opponent", True, (199, 199, 199)), (420, 410))
-        screen.blit(pygame.image.load(rare_animal_images[0]), (340, 470))
-        screen.blit(points_font.render("Single use shield", True, (199, 199, 199)), (420, 480))
+        # Animal pictures, labelled from the ANIMALS table so the legend cannot
+        # drift out of step with what the animals are actually worth
+        for legend_name, image_at, label_at in legend_layout:
+            screen.blit(pygame.image.load(legend_name), image_at)
+            screen.blit(points_font.render(ANIMALS[legend_name]["legend"], True, (199, 199, 199)), label_at)
         for event in pygame.event.get():
             # Quit
             if event.type == pygame.QUIT:
@@ -287,7 +336,7 @@ while start:
             screen.blit(animal["img"], (animal["x_pos"], animal["y_pos"]))
             # pygame.draw.rect(screen, (100, 100, 100), animal["animal_rect"], 4)
             # Summon new animals and delete old animals
-            if animal["image_name"] == "images/001-eagle.png":
+            if animal["image_name"] == EAGLE:
                 if animal["x_pos"] > 3200:
                     summonAnimal(0)
                     animals.remove(animal)
@@ -297,64 +346,14 @@ while start:
             # Check collision and calculate points
             if rect.colliderect(animal["animal_rect"]):
                 animal["y_pos"] = 1000
-                if animal["image_name"] == animal_images[0]:  # cow
-                    player_score += 3
-                if animal["image_name"] == animal_images[1]:  # hen
-                    player_score += 1
-                if animal["image_name"] == animal_images[2]:  # elephant
-                    player_score += 5
-                if animal["image_name"] == animal_images[3]:  # rabbit
-                    player_score += 1
-                if animal["image_name"] == animal_images[4]:  # bomb
-                    # Check for star
-                    shield, player_score = checkForStar(shield, player_score, "bomb")
-                if animal["image_name"] == animal_images[5]:  # truck
-                    # Check for star
-                    shield, player_score = checkForStar(shield, player_score, "truck")
-                if animal["image_name"] == animal_images[6]:  # tiger
-                    player2_score -= 3
-                if animal["image_name"] == rare_animal_images[0]:  # star
-                    shield = True
-                if animal["image_name"] == rare_animal_images[1]:  # eagle
-                    player_score += 8
-                if animal["image_name"] == rare_animal_images[2]:  # present
-                    # Calculate random value of present
-                    lucky = random .randint(0, 1)
-                    if lucky == 0:
-                        player_score -= 10
-                    else:
-                        player_score += 10
+                player_score, player2_score, shield = collectAnimal(
+                    animal["image_name"], player_score, player2_score, shield)
             if rect2.colliderect(animal["animal_rect"]):
                 animal["y_pos"] = 1000
-                if animal["image_name"] == animal_images[0]:  # cow
-                    player2_score += 3
-                if animal["image_name"] == animal_images[1]:  # hen
-                    player2_score += 1
-                if animal["image_name"] == animal_images[2]:  # elephant
-                    player2_score += 5
-                if animal["image_name"] == animal_images[3]:  # rabbit
-                    player2_score += 1
-                if animal["image_name"] == animal_images[4]:  # bomb
-                    # Check for star
-                    shield2, player2_score = checkForStar(shield2, player2_score, "bomb")
-                if animal["image_name"] == animal_images[5]:  # truck
-                    # Check for star
-                    shield2, player2_score = checkForStar(shield2, player2_score, "truck")
-                if animal["image_name"] == animal_images[6]:  # tiger
-                    player_score -= 3
-                if animal["image_name"] == rare_animal_images[0]:  # star
-                    shield2 = True
-                if animal["image_name"] == rare_animal_images[1]:  # eagle
-                    player2_score += 8
-                if animal["image_name"] == rare_animal_images[2]:  # present
-                    # Calculate random value of present
-                    lucky = random .randint(0, 1)
-                    if lucky == 0:
-                        player2_score -= 10
-                    else:
-                        player2_score += 10
+                player2_score, player_score, shield2 = collectAnimal(
+                    animal["image_name"], player2_score, player_score, shield2)
             # Start animal movement
-            if animal["image_name"] == rare_animal_images[1] and animal["x_pos"] >= -1000:
+            if animal["image_name"] == EAGLE and animal["x_pos"] >= -1000:
                 animal["x_velocity"] = 10
             else:
                 animal["x_velocity"] = 5
