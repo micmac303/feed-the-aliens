@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 .venv/bin/python main.py     # or: python main.py, with pygame installed
 ```
 
-Run from the repo root — asset paths (`images/...`) and `Highscore.txt` are relative to the working directory. `.venv/` holds Python 3.12 + pygame 2.6.1; there is no `requirements.txt`, no build step, no lint config, and no test suite.
+Run from the repo root — asset paths (`images/...`) and `Highscore.txt` are relative to the working directory. `.venv/` holds Python 3.14 + **pygame-ce** (the maintained community fork; same `import pygame` API — never install the stalled `pygame` package alongside it). `requirements.txt` has the one dependency: `pip install -r requirements.txt` into a fresh venv is the full setup. There is no build step, no lint config, and no test suite.
 
 `Highscore.txt` is local player data, gitignored and not tracked. It is created from `default_scores` on first run, so a fresh clone needs no setup.
 

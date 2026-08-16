@@ -1,0 +1,3 @@
+# pygame-ce is the maintained fork of pygame (same "import pygame" API).
+# Do not install "pygame" alongside it - they conflict over the package name.
+pygame-ce>=2.5.8
