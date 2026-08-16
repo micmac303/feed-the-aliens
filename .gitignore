@@ -130,3 +130,5 @@ dmypy.json
 
 # ide
 .idea
+# Local high score data, not source
+Highscore.txt

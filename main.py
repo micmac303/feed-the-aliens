@@ -53,13 +53,31 @@ colours = [(49, 201, 235), (34, 52, 153), (50, 92, 166), (89, 125, 189), (89, 14
 chosen_color = colours[random.randint(0, len(colours) - 1)]
 print(chosen_color)
 
-# Load highscores
-file = open("Highscore.txt", "r")
-highscore = file.readlines()
-# Split string in array of score strings
-split_scores = highscore[0].split()
-# Convert all items to floats
-scores = list(map(float, split_scores))
+# Highscores are player data, not source, so Highscore.txt is not in git.
+# A fresh clone starts from these defaults.
+default_scores = [30.0, 40.0, 50.0, 52.37, 70.0]
+
+
+# Space separated list, overwriting any existing scores
+def saveScores(score_list):
+    with open("Highscore.txt", "w") as scores_file:
+        scores_file.write(" ".join(str(x) for x in score_list))
+
+
+# Read the five best times, recreating the file if it is missing or corrupt
+def loadScores():
+    try:
+        with open("Highscore.txt", "r") as scores_file:
+            loaded = sorted(map(float, scores_file.read().split()))[:5]
+        if len(loaded) < 5:
+            raise ValueError("not enough scores")
+        return loaded
+    except (OSError, ValueError):
+        saveScores(default_scores)
+        return list(default_scores)
+
+
+scores = loadScores()
 trophy = False
 
 # Player 1
@@ -344,20 +362,12 @@ while start:
         if player2_score >= 100:
             screen.blit(space_font.render("PLAYER 2 WINS!", True, (97, 8, 207)), (355, 100))
             screen.blit(player2_img, (440, 150))
-        # Highscores
-        if current_time/1000 < float(split_scores[4]):
+        # Highscores, saved once per round rather than on every frame
+        if not trophy and current_time/1000 < scores[4]:
             trophy = True
-            new_score = round(current_time/1000, 2)
-            split_scores.remove(split_scores[4])
-            # Append new score to list
-            split_scores.append(str(new_score))
-            # Convert all items to floats
-            scores = list(map(float, split_scores))
-            # Sort scores
-            scores.sort()
-            # Space separated list and overwrite scores
-            file = open("Highscore.txt", "w")
-            file.write(" ".join(str(x) for x in scores))
+            # Drop the slowest time and insert this one
+            scores = sorted(scores[:4] + [round(current_time/1000, 2)])
+            saveScores(scores)
         if trophy:
             screen.blit(space_font.render("New High Score!", True, (224, 185, 9)), (355, 380))
             screen.blit(pygame.image.load("images/001-trophy.png"), (440, 430))
@@ -391,12 +401,7 @@ while start:
                         summonAnimal(i)
 
                     # Load highscores
-                    file = open("Highscore.txt", "r")
-                    highscore = file.readlines()
-                    # Split string in array of score strings
-                    split_scores = highscore[0].split()
-                    # Convert all items to floats
-                    scores = list(map(float, split_scores))
+                    scores = loadScores()
                     trophy = False
 
                     chosen_color = colours[random.randint(0, len(colours) - 1)]
