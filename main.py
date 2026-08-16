@@ -32,16 +32,13 @@ space_font = pygame.font.SysFont("impact", 40)
 title_font = pygame.font.SysFont("impact", 90)
 
 # Scores
-player_score = 0
-player2_score = 0
 point_goal = 100
 
 # Timer
 clock = pygame.time.Clock()
-current_time = 0
 
-# Frame rate
-last_time = time.time()
+# Per-round state (player_score, playerX, shield, animals, ...) is created by
+# newRound() below, so each starting value is written in exactly one place.
 
 # Random background colour
 colours = [(49, 201, 235), (34, 52, 153), (50, 92, 166), (89, 125, 189), (89, 146, 189), (84, 180, 199),  # Blue
@@ -49,9 +46,6 @@ colours = [(49, 201, 235), (34, 52, 153), (50, 92, 166), (89, 125, 189), (89, 14
            (122, 0, 156), (145, 24, 196), (171, 34, 199), (77, 13, 181), (120, 76, 207), (96, 3, 171),  # Purple
            (171, 173, 184), (194, 197, 209), (226, 204, 227), (173, 174, 179), (204, 197, 212), (107, 90, 91),  # Gray
            ]
-
-chosen_color = colours[random.randint(0, len(colours) - 1)]
-print(chosen_color)
 
 # Highscores are player data, not source, so Highscore.txt is not in git.
 # A fresh clone starts from these defaults.
@@ -77,22 +71,11 @@ def loadScores():
         return list(default_scores)
 
 
-scores = loadScores()
-trophy = False
-
 # Player 1
 player_img = pygame.image.load("images/001-ufo.png")
-rect = player_img.get_rect()
-playerX = 200
-playerY = 30
-shield = False
 
 # Player 2
 player2_img = pygame.image.load("images/021-ufo.png")
-rect2 = player2_img.get_rect()
-player2X = 700
-player2Y = 30
-shield2 = False
 
 # Animal lists
 animals = []
@@ -132,9 +115,51 @@ def checkForStar(shield_active, score, obstacle):
     return shield_active, score
 
 
-# Summon initial animals
-for i in range(0, 27):
-    summonAnimal(i)
+# Reset everything that belongs to a single round. Called once at startup and
+# again on restart, so a starting value only ever has to be written here.
+# Anything new that should start fresh each round belongs in this function.
+def newRound():
+    global player_score, player2_score
+    global playerX, playerY, shield, rect
+    global player2X, player2Y, shield2, rect2
+    global scores, trophy, chosen_color
+    global current_time, last_time
+
+    # Scores
+    player_score = 0
+    player2_score = 0
+
+    # Player 1
+    rect = player_img.get_rect()
+    playerX = 200
+    playerY = 30
+    shield = False
+
+    # Player 2
+    rect2 = player2_img.get_rect()
+    player2X = 700
+    player2Y = 30
+    shield2 = False
+
+    # Animals, at their staggered starting offsets off the left edge
+    animals.clear()
+    for i in range(0, 27):
+        summonAnimal(i)
+
+    # Highscores
+    scores = loadScores()
+    trophy = False
+
+    # Timer and frame rate
+    current_time = 0
+    last_time = time.time()
+
+    # Random background colour
+    chosen_color = colours[random.randint(0, len(colours) - 1)]
+    print(chosen_color)
+
+
+newRound()
 
 running = False
 start_screen = True
@@ -378,32 +403,9 @@ while start:
                 start = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
-                    # Reset scores & coordinates & shields
-                    player_score = 0
-                    player2_score = 0
-                    # Player 1
-                    rect = player_img.get_rect()
-                    playerX = 200
-                    playerY = 30
-                    shield = False
-                    # Player 2
-                    rect2 = player2_img.get_rect()
-                    player2X = 700
-                    player2Y = 30
-                    shield2 = False
-
+                    newRound()
+                    # Screen flags are loop control, not round state
                     start = True
                     start_screen = True
                     end_screen = False
-
-                    animals.clear()
-                    for i in range(0, 27):
-                        summonAnimal(i)
-
-                    # Load highscores
-                    scores = loadScores()
-                    trophy = False
-
-                    chosen_color = colours[random.randint(0, len(colours) - 1)]
-                    print(chosen_color)
 print(current_time/1000)
