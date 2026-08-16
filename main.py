@@ -71,11 +71,22 @@ def loadScores():
         return list(default_scores)
 
 
+# Images are loaded from disk once and reused. The start screen redraws ten
+# legend images every frame, and every animal spawn needs a surface.
+image_cache = {}
+
+
+def loadImage(path):
+    if path not in image_cache:
+        image_cache[path] = pygame.image.load(path)
+    return image_cache[path]
+
+
 # Player 1
-player_img = pygame.image.load("images/001-ufo.png")
+player_img = loadImage("images/001-ufo.png")
 
 # Player 2
-player2_img = pygame.image.load("images/021-ufo.png")
+player2_img = loadImage("images/021-ufo.png")
 
 animals = []
 
@@ -135,10 +146,13 @@ def summonAnimal(i_arg):
     else:
         chosen_animal = animal_images[random.randint(0, len(animal_images) - 1)]
 
+    # The surface is shared between animals of the same type - it is only ever
+    # blitted, never drawn into - but get_rect() gives each one its own hitbox
+    animal_img = loadImage(chosen_animal)
     animal_arg = {
         "image_name": chosen_animal,
-        "img": pygame.image.load(chosen_animal),
-        "animal_rect": pygame.image.load(chosen_animal).get_rect(),
+        "img": animal_img,
+        "animal_rect": animal_img.get_rect(),
         "x_pos": ((i_arg + 1) * -81) - 1000,
         "y_pos": random.randint(120, 500),
         "x_velocity": 0
@@ -221,7 +235,6 @@ def newRound():
 
     # Random background colour
     chosen_color = colours[random.randint(0, len(colours) - 1)]
-    print(chosen_color)
 
 
 newRound()
@@ -239,9 +252,9 @@ while start:
         pygame.display.flip()
         screen.fill((0, 0, 0))
         # Image decoration
-        screen.blit(pygame.image.load("images/006-ufo-1.png"), (490, -2))
-        screen.blit(pygame.image.load("images/005-alien.png"), (220, 535))
-        screen.blit(pygame.image.load("images/001-alien.png"), (660, 535))
+        screen.blit(loadImage("images/006-ufo-1.png"), (490, -2))
+        screen.blit(loadImage("images/005-alien.png"), (220, 535))
+        screen.blit(loadImage("images/001-alien.png"), (660, 535))
         # Instructions
         screen.blit(title_font.render("Feed The Aliens", True, (199, 199, 199)), (220, 15))
         screen.blit(instruction_font.render("Collect the animals to score points", True, (97, 8, 207)), (220, 130))
@@ -255,7 +268,7 @@ while start:
         # Animal pictures, labelled from the ANIMALS table so the legend cannot
         # drift out of step with what the animals are actually worth
         for legend_name, image_at, label_at in legend_layout:
-            screen.blit(pygame.image.load(legend_name), image_at)
+            screen.blit(loadImage(legend_name), image_at)
             screen.blit(points_font.render(ANIMALS[legend_name]["legend"], True, (199, 199, 199)), label_at)
         for event in pygame.event.get():
             # Quit
@@ -379,11 +392,12 @@ while start:
         screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
         screen.blit(space_font.render("P1: " + str(player_score), True, (240, 90, 26)), (30, 30))
         screen.blit(space_font.render("P2: " + str(player2_score), True, (97, 8, 207)), (880, 30))
-        # Display winner
-        if player_score >= 100:
+        # Display winner. Tested against point_goal, the same thing that ended
+        # the game, so changing the goal cannot leave the winner unnamed
+        if player_score >= point_goal:
             screen.blit(space_font.render("PLAYER 1 WINS!", True, (240, 90, 26)), (355, 100))
             screen.blit(player_img, (440, 150))
-        if player2_score >= 100:
+        if player2_score >= point_goal:
             screen.blit(space_font.render("PLAYER 2 WINS!", True, (97, 8, 207)), (355, 100))
             screen.blit(player2_img, (440, 150))
         # Highscores, saved once per round rather than on every frame
@@ -394,7 +408,7 @@ while start:
             saveScores(scores)
         if trophy:
             screen.blit(space_font.render("New High Score!", True, (224, 185, 9)), (355, 380))
-            screen.blit(pygame.image.load("images/001-trophy.png"), (440, 430))
+            screen.blit(loadImage("images/001-trophy.png"), (440, 430))
         # Exit
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -407,4 +421,3 @@ while start:
                     start = True
                     start_screen = True
                     end_screen = False
-print(current_time/1000)
