@@ -37,7 +37,7 @@ point_goal = 100
 # Timer
 clock = pygame.time.Clock()
 
-# Per-round state (player_score, playerX, shield, animals, ...) is created by
+# Per-round state (the two Player objects, animals, scores, ...) is created by
 # newRound() below, so each starting value is written in exactly one place.
 
 # Random background colour
@@ -160,65 +160,100 @@ def summonAnimal(i_arg):
     animals.append(animal_arg)
 
 
-# A shield absorbs one hit instead of the player taking the penalty
-def checkForStar(shield_active, score, penalty):
-    if shield_active:
-        shield_active = False
-    else:
-        score += penalty
-    return shield_active, score
+# One UFO: score, position, shield, plus the controls and HUD placement that
+# tell the two players apart. Both players are instances of this class, so
+# there is no per-player duplication; newRound() builds two fresh ones, which
+# is what resets score/position/shield each round.
+class Player:
+    def __init__(self, img, start_x, controls, label, controls_text, color, score_color, hud_x, score_x):
+        # Identity: fixed for the whole session
+        self.img = img
+        self.controls = controls          # {"left"/"right"/"up"/"down": key constant}
+        self.label = label
+        self.controls_text = controls_text
+        self.color = color
+        self.score_color = score_color
+        self.hud_x = hud_x
+        self.score_x = score_x
+        # Round state: starts fresh because each round gets a fresh Player
+        self.x = start_x
+        self.y = 30
+        self.score = 0
+        self.shield = False
+        self.rect = img.get_rect()
 
+    # Movement constants are deliberately asymmetric (left 5.8, right 7.0)
+    def move(self, pressed, dt):
+        if pressed[self.controls["left"]] and self.x > 0:
+            self.x -= 5.8 * dt
+        if pressed[self.controls["right"]] and self.x < 936:
+            self.x += 7 * dt
+        if pressed[self.controls["up"]] and self.y > -8:
+            self.y -= 5.9 * dt
+        if pressed[self.controls["down"]] and self.y < 544:
+            self.y += 5.9 * dt
 
-# Apply one collected animal to the collecting player. Returns the updated
-# (score, opponent_score, shield_active) - callers must reassign all three.
-def collectAnimal(image_name, score, opponent_score, shield_active):
-    animal_type = ANIMALS[image_name]
-    effect = animal_type["effect"]
-    value = animal_type["value"]
+    # The rect returned by the filled draw.rect call is the hitbox: the 32x32
+    # centre of the 64x64 sprite, so a collision needs real overlap
+    def draw(self, screen):
+        if self.shield:
+            pygame.draw.rect(screen, (66, 239, 245), (self.x, self.y, 64, 64), 6)
+        self.rect = pygame.draw.rect(screen, (0, 0, 0), (self.x + 16, self.y + 16, 32, 32), 0)
+        screen.blit(self.img, (self.x, self.y))
 
-    if effect == "points":
-        score += value
-    elif effect == "obstacle":
-        shield_active, score = checkForStar(shield_active, score, value)
-    elif effect == "opponent":
-        opponent_score += value
-    elif effect == "shield":
-        shield_active = True
-    elif effect == "random":
-        # Calculate random value of present
-        if random.randint(0, 1) == 0:
-            score -= value
-        else:
-            score += value
+    def draw_hud(self, screen):
+        screen.blit(points_font.render(self.label, True, self.color), (self.hud_x, 0))
+        screen.blit(points_font.render(self.controls_text, True, self.color), (self.hud_x, 30))
+        screen.blit(huge_font.render(str(self.score), True, self.score_color), (self.score_x, 150))
 
-    return score, opponent_score, shield_active
+    # Apply one collected animal, looked up in the ANIMALS table
+    def collect(self, image_name, opponent):
+        animal_type = ANIMALS[image_name]
+        effect = animal_type["effect"]
+        value = animal_type["value"]
+
+        if effect == "points":
+            self.score += value
+        elif effect == "obstacle":
+            # A shield absorbs one hit instead of the player taking the penalty
+            if self.shield:
+                self.shield = False
+            else:
+                self.score += value
+        elif effect == "opponent":
+            opponent.score += value
+        elif effect == "shield":
+            self.shield = True
+        elif effect == "random":
+            # Coin flip on the value of the present
+            if random.randint(0, 1) == 0:
+                self.score -= value
+            else:
+                self.score += value
 
 
 # Reset everything that belongs to a single round. Called once at startup and
 # again on restart, so a starting value only ever has to be written here.
 # Anything new that should start fresh each round belongs in this function.
 def newRound():
-    global player_score, player2_score
-    global playerX, playerY, shield, rect
-    global player2X, player2Y, shield2, rect2
+    global player, player2
     global scores, trophy, chosen_color
     global current_time, last_time
 
-    # Scores
-    player_score = 0
-    player2_score = 0
-
-    # Player 1
-    rect = player_img.get_rect()
-    playerX = 200
-    playerY = 30
-    shield = False
-
-    # Player 2
-    rect2 = player2_img.get_rect()
-    player2X = 700
-    player2Y = 30
-    shield2 = False
+    # Fresh Player objects reset score, position and shield; the identity
+    # arguments (controls, colours, HUD spots) are what tell the two apart
+    player = Player(player_img, start_x=200,
+                    controls={"left": pygame.K_a, "right": pygame.K_d,
+                              "up": pygame.K_w, "down": pygame.K_s},
+                    label="PLAYER 1", controls_text="WASD",
+                    color=(240, 90, 26), score_color=(181, 91, 53),
+                    hud_x=100, score_x=20)
+    player2 = Player(player2_img, start_x=700,
+                     controls={"left": pygame.K_LEFT, "right": pygame.K_RIGHT,
+                               "up": pygame.K_UP, "down": pygame.K_DOWN},
+                     label="PLAYER 2", controls_text="ARROW KEYS",
+                     color=(97, 8, 207), score_color=(125, 99, 171),
+                     hud_x=780, score_x=530)
 
     # Animals, at their staggered starting offsets off the left edge
     animals.clear()
@@ -286,7 +321,7 @@ while start:
     # Game loop
     while running:
         # Point limit to end game
-        if player_score >= point_goal or player2_score >= point_goal:
+        if player.score >= point_goal or player2.score >= point_goal:
             end_screen = True
             running = False
         # Update display
@@ -304,40 +339,15 @@ while start:
         clock.tick(600)
         # Display scores and time
         screen.blit(timer_font.render("Time: " + str(round(current_time / 1000, 2)), True, (0, 0, 0)), (320, 30))
-        screen.blit(points_font.render("PLAYER 1", True, (240, 90, 26)), (100, 0))
-        screen.blit(points_font.render("WASD", True, (240, 90, 26)), (100, 30))
-        screen.blit(huge_font.render(str(player_score), True, (181, 91, 53)), (20, 150))
-        screen.blit(points_font.render("PLAYER 2", True, (97, 8, 207)), (780, 0))
-        screen.blit(points_font.render("ARROW KEYS", True, (97, 8, 207)), (780, 30))
-        screen.blit(huge_font.render(str(player2_score), True, (125, 99, 171)), (530, 150))
-        # Load and update hitboxes
-        if shield:
-            rect = pygame.draw.rect(screen, (66, 239, 245), (playerX, playerY, 64, 64), 6)
-        if shield2:
-            rect2 = pygame.draw.rect(screen, (66, 239, 245), (player2X, player2Y, 64, 64), 6)
-        rect = pygame.draw.rect(screen, (0, 0, 0), (playerX + 16, playerY + 16, 32, 32), 0)
-        rect2 = pygame.draw.rect(screen, (0, 0, 0), (player2X + 16, player2Y + 16, 32, 32), 0)
-        # Load players
-        screen.blit(player2_img, (player2X, player2Y))
-        screen.blit(player_img, (playerX, playerY))
-        # Player movement and update players and collide with edge of screen
+        player.draw_hud(screen)
+        player2.draw_hud(screen)
+        # Draw players, updating their hitboxes; player 1 blits last, on top
+        player2.draw(screen)
+        player.draw(screen)
+        # Player movement and collide with edge of screen
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_a] and playerX > 0:
-            playerX -= 5.8 * dt
-        if keys[pygame.K_d] and playerX < 936:
-            playerX += 7 * dt
-        if keys[pygame.K_w] and playerY > -8:
-            playerY -= 5.9 * dt
-        if keys[pygame.K_s] and playerY < 544:
-            playerY += 5.9 * dt
-        if keys[pygame.K_LEFT] and player2X > 0:
-            player2X -= 5.8 * dt
-        if keys[pygame.K_RIGHT] and player2X < 936:
-            player2X += 7 * dt
-        if keys[pygame.K_UP] and player2Y > -8:
-            player2Y -= 5.9 * dt
-        if keys[pygame.K_DOWN] and player2Y < 544:
-            player2Y += 5.9 * dt
+        player.move(keys, dt)
+        player2.move(keys, dt)
         # Load animals individually
         for animal in animals:
             # Load hitboxes
@@ -357,14 +367,10 @@ while start:
                 summonAnimal(0)
                 animals.remove(animal)
             # Check collision and calculate points
-            if rect.colliderect(animal["animal_rect"]):
-                animal["y_pos"] = 1000
-                player_score, player2_score, shield = collectAnimal(
-                    animal["image_name"], player_score, player2_score, shield)
-            if rect2.colliderect(animal["animal_rect"]):
-                animal["y_pos"] = 1000
-                player2_score, player_score, shield2 = collectAnimal(
-                    animal["image_name"], player2_score, player_score, shield2)
+            for p, opponent in ((player, player2), (player2, player)):
+                if p.rect.colliderect(animal["animal_rect"]):
+                    animal["y_pos"] = 1000
+                    p.collect(animal["image_name"], opponent)
             # Start animal movement
             if animal["image_name"] == EAGLE and animal["x_pos"] >= -1000:
                 animal["x_velocity"] = 10
@@ -390,16 +396,14 @@ while start:
         screen.blit(points_font.render("Press r to restart", True, (220, 220, 220)), (10, 550))
         screen.blit(timer_font.render("Time: " + str(round(current_time/1000, 2)), True, (199, 199, 199)), (350, 10))
         screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
-        screen.blit(space_font.render("P1: " + str(player_score), True, (240, 90, 26)), (30, 30))
-        screen.blit(space_font.render("P2: " + str(player2_score), True, (97, 8, 207)), (880, 30))
+        screen.blit(space_font.render("P1: " + str(player.score), True, player.color), (30, 30))
+        screen.blit(space_font.render("P2: " + str(player2.score), True, player2.color), (880, 30))
         # Display winner. Tested against point_goal, the same thing that ended
         # the game, so changing the goal cannot leave the winner unnamed
-        if player_score >= point_goal:
-            screen.blit(space_font.render("PLAYER 1 WINS!", True, (240, 90, 26)), (355, 100))
-            screen.blit(player_img, (440, 150))
-        if player2_score >= point_goal:
-            screen.blit(space_font.render("PLAYER 2 WINS!", True, (97, 8, 207)), (355, 100))
-            screen.blit(player2_img, (440, 150))
+        for p in (player, player2):
+            if p.score >= point_goal:
+                screen.blit(space_font.render(p.label + " WINS!", True, p.color), (355, 100))
+                screen.blit(p.img, (440, 150))
         # Highscores, saved once per round rather than on every frame
         if not trophy and current_time/1000 < scores[4]:
             trophy = True
