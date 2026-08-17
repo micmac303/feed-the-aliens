@@ -113,7 +113,7 @@ ANIMALS = {
     "images/001-gift.png": {"effect": "random", "value": 10, "legend": "Random +10 / -10"},
 }
 
-# Spawn pools: rare animals come up on a 1 in 8 roll in summonAnimal()
+# Spawn pools: rare animals come up on a 1 in 8 roll in Animal.__init__
 animal_images = ["images/003-cow.png", "images/001-hen.png", "images/003-elephant.png", "images/002-rabbit.png",
                  "images/001-bomb.png", "images/002-truck.png", "images/003-tiger.png"]
 rare_animal_images = ["images/001-star.png", EAGLE, "images/001-gift.png"]
@@ -138,26 +138,43 @@ legend_layout = [
 ]
 
 
-# Create an animal and add it to animals[]
-def summonAnimal(i_arg):
-    calculate_rare = random.randint(1, 8)
-    if calculate_rare == 8:
-        chosen_animal = rare_animal_images[random.randint(0, len(rare_animal_images) - 1)]
-    else:
-        chosen_animal = animal_images[random.randint(0, len(animal_images) - 1)]
+# One drifting animal. The type is rolled at construction: 1 in 8 spawns come
+# from the rare pool. What an animal *does* when collected stays in the
+# ANIMALS table above - the object only carries movement state and its type
+# tag, so the eagle's speed and recycle distance are set once, here.
+class Animal:
+    def __init__(self, slot=0):
+        if random.randint(1, 8) == 8:
+            self.image_name = rare_animal_images[random.randint(0, len(rare_animal_images) - 1)]
+        else:
+            self.image_name = animal_images[random.randint(0, len(animal_images) - 1)]
+        # The surface is shared between animals of the same type - it is only
+        # ever blitted, never drawn into - but get_rect() gives each one its
+        # own hitbox
+        self.img = loadImage(self.image_name)
+        self.rect = self.img.get_rect()
+        # slot staggers the 27 starting animals off the left edge
+        self.x = ((slot + 1) * -81) - 1000
+        self.y = random.randint(120, 500)
+        if self.image_name == EAGLE:
+            # Eagles fly fast, and far off the right edge before recycling
+            self.speed = 10
+            self.recycle_x = 3200
+        else:
+            self.speed = 5
+            self.recycle_x = 1100
 
-    # The surface is shared between animals of the same type - it is only ever
-    # blitted, never drawn into - but get_rect() gives each one its own hitbox
-    animal_img = loadImage(chosen_animal)
-    animal_arg = {
-        "image_name": chosen_animal,
-        "img": animal_img,
-        "animal_rect": animal_img.get_rect(),
-        "x_pos": ((i_arg + 1) * -81) - 1000,
-        "y_pos": random.randint(120, 500),
-        "x_velocity": 0
-    }
-    animals.append(animal_arg)
+    def update(self, dt):
+        # The hitbox syncs to the pre-move position, so a collision tracks the
+        # previous frame's drawn spot - same as the original dict-based loop
+        self.rect.x = self.x
+        self.rect.y = self.y
+        # Left of x = -1000 everything moves at 5 so the staggered spawn queue
+        # keeps its pacing; an eagle only speeds up once it is clear of it
+        self.x += (self.speed if self.x >= -1000 else 5) * dt
+
+    def draw(self, screen):
+        screen.blit(self.img, (self.x, self.y))
 
 
 # One UFO: score, position, shield, plus the controls and HUD placement that
@@ -258,7 +275,7 @@ def newRound():
     # Animals, at their staggered starting offsets off the left edge
     animals.clear()
     for i in range(0, 27):
-        summonAnimal(i)
+        animals.append(Animal(slot=i))
 
     # Highscores
     scores = loadScores()
@@ -348,34 +365,20 @@ while start:
         keys = pygame.key.get_pressed()
         player.move(keys, dt)
         player2.move(keys, dt)
-        # Load animals individually
+        # Update, draw, recycle and collide each animal
         for animal in animals:
-            # Load hitboxes
-            animal["animal_rect"].x = animal["x_pos"]
-            animal["animal_rect"].y = animal["y_pos"]
-            # Update positions
-            animal["x_pos"] += animal["x_velocity"] * dt
-            # Display animals
-            screen.blit(animal["img"], (animal["x_pos"], animal["y_pos"]))
-            # pygame.draw.rect(screen, (100, 100, 100), animal["animal_rect"], 4)
-            # Summon new animals and delete old animals
-            if animal["image_name"] == EAGLE:
-                if animal["x_pos"] > 3200:
-                    summonAnimal(0)
-                    animals.remove(animal)
-            elif animal["x_pos"] > 1100:
-                summonAnimal(0)
+            animal.update(dt)
+            animal.draw(screen)
+            # pygame.draw.rect(screen, (100, 100, 100), animal.rect, 4)
+            # Replace animals that have flown off the right edge
+            if animal.x > animal.recycle_x:
+                animals.append(Animal())
                 animals.remove(animal)
             # Check collision and calculate points
             for p, opponent in ((player, player2), (player2, player)):
-                if p.rect.colliderect(animal["animal_rect"]):
-                    animal["y_pos"] = 1000
-                    p.collect(animal["image_name"], opponent)
-            # Start animal movement
-            if animal["image_name"] == EAGLE and animal["x_pos"] >= -1000:
-                animal["x_velocity"] = 10
-            else:
-                animal["x_velocity"] = 5
+                if p.rect.colliderect(animal.rect):
+                    animal.y = 1000
+                    p.collect(animal.image_name, opponent)
         # Quit
         for event in pygame.event.get():
             if event.type == pygame.QUIT:  #or current_time/1000 > 16
