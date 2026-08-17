@@ -289,17 +289,11 @@ def newRound():
     chosen_color = colours[random.randint(0, len(colours) - 1)]
 
 
-newRound()
-
-running = False
-start_screen = True
-end_screen = False
-
-# Game loop
-
-start = True
-while start:
-    while start_screen:
+# Each screen below owns its loop, drawing and event handling, and returns
+# the name of the next screen: "game", "end", "start" or "quit". The state
+# machine at the bottom of the file hops between them until one quits.
+def runStartScreen():
+    while True:
         # Update display
         pygame.display.flip()
         screen.fill((0, 0, 0))
@@ -325,22 +319,22 @@ while start:
         for event in pygame.event.get():
             # Quit
             if event.type == pygame.QUIT:
-                start_screen = False
-                start = False
-                # Continue to game
+                return "quit"
+            # Continue to game
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    running = True
-                    start_screen = False
+                    return "game"
+
+
+def runGame():
+    global current_time, last_time
 
     # Reset timer
     temp = pygame.time.get_ticks()
-    # Game loop
-    while running:
+    while True:
         # Point limit to end game
         if player.score >= point_goal or player2.score >= point_goal:
-            end_screen = True
-            running = False
+            return "end"
         # Update display
         pygame.display.flip()
         screen.fill(chosen_color)
@@ -383,10 +377,13 @@ while start:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:  #or current_time/1000 > 16
                 time.sleep(0.2)
-                running = False
-                start = False
+                return "quit"
 
-    while end_screen:
+
+def runEndScreen():
+    global scores, trophy
+
+    while True:
         # Update display
         pygame.display.flip()
         # End screen
@@ -419,12 +416,21 @@ while start:
         # Exit
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                end_screen = False
-                start = False
+                return "quit"
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     newRound()
-                    # Screen flags are loop control, not round state
-                    start = True
-                    start_screen = True
-                    end_screen = False
+                    return "start"
+
+
+newRound()
+
+# Screen state machine: run one screen at a time until one of them quits
+screen_name = "start"
+while screen_name != "quit":
+    if screen_name == "start":
+        screen_name = runStartScreen()
+    elif screen_name == "game":
+        screen_name = runGame()
+    elif screen_name == "end":
+        screen_name = runEndScreen()
