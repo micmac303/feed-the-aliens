@@ -37,7 +37,7 @@ point_goal = 100
 # Timer
 clock = pygame.time.Clock()
 
-# Per-round state (the two Player objects, animals, scores, ...) is created by
+# Per-round state (the players list, animals, rng, scores, ...) is created by
 # newRound() below, so each starting value is written in exactly one place.
 
 # Random background colour
@@ -144,10 +144,10 @@ legend_layout = [
 # tag, so the eagle's speed and recycle distance are set once, here.
 class Animal:
     def __init__(self, slot=0):
-        if random.randint(1, 8) == 8:
-            self.image_name = rare_animal_images[random.randint(0, len(rare_animal_images) - 1)]
+        if rng.randint(1, 8) == 8:
+            self.image_name = rare_animal_images[rng.randint(0, len(rare_animal_images) - 1)]
         else:
-            self.image_name = animal_images[random.randint(0, len(animal_images) - 1)]
+            self.image_name = animal_images[rng.randint(0, len(animal_images) - 1)]
         # The surface is shared between animals of the same type - it is only
         # ever blitted, never drawn into - but get_rect() gives each one its
         # own hitbox
@@ -155,7 +155,7 @@ class Animal:
         self.rect = self.img.get_rect()
         # slot staggers the 27 starting animals off the left edge
         self.x = ((slot + 1) * -81) - 1000
-        self.y = random.randint(120, 500)
+        self.y = rng.randint(120, 500)
         if self.image_name == EAGLE:
             # Eagles fly fast, and far off the right edge before recycling
             self.speed = 10
@@ -182,11 +182,12 @@ class Animal:
 # there is no per-player duplication; newRound() builds two fresh ones, which
 # is what resets score/position/shield each round.
 class Player:
-    def __init__(self, img, start_x, controls, label, controls_text, color, score_color, hud_x, score_x):
+    def __init__(self, img, start_x, number, controls, controls_text, color, score_color, hud_x, score_x):
         # Identity: fixed for the whole session
         self.img = img
+        self.number = number              # 1-based, and the future network id
+        self.label = "PLAYER " + str(number)
         self.controls = controls          # {"left"/"right"/"up"/"down": key constant}
-        self.label = label
         self.controls_text = controls_text
         self.color = color
         self.score_color = score_color
@@ -199,23 +200,32 @@ class Player:
         self.shield = False
         self.rect = img.get_rect()
 
-    # Movement constants are deliberately asymmetric (left 5.8, right 7.0)
-    def move(self, pressed, dt):
-        if pressed[self.controls["left"]] and self.x > 0:
+    # Movement constants are deliberately asymmetric (left 5.8, right 7.0).
+    # intents is {"left"/"right"/"up"/"down": bool} - the sim never touches
+    # the keyboard, so a replay, an AI or a network packet can drive a player
+    # by producing the same dict
+    def move(self, intents, dt):
+        if intents["left"] and self.x > 0:
             self.x -= 5.8 * dt
-        if pressed[self.controls["right"]] and self.x < 936:
+        if intents["right"] and self.x < 936:
             self.x += 7 * dt
-        if pressed[self.controls["up"]] and self.y > -8:
+        if intents["up"] and self.y > -8:
             self.y -= 5.9 * dt
-        if pressed[self.controls["down"]] and self.y < 544:
+        if intents["down"] and self.y < 544:
             self.y += 5.9 * dt
 
-    # The rect returned by the filled draw.rect call is the hitbox: the 32x32
-    # centre of the 64x64 sprite, so a collision needs real overlap
+    # Advance one sim step. The hitbox is the 32x32 centre of the 64x64
+    # sprite, so a collision needs real overlap; it syncs to the pre-move
+    # position, so collisions track the previous frame's drawn spot - the
+    # same one-frame lag as Animal.update
+    def update(self, intents, dt):
+        self.rect = pygame.Rect(self.x + 16, self.y + 16, 32, 32)
+        self.move(intents, dt)
+
     def draw(self, screen):
         if self.shield:
             pygame.draw.rect(screen, (66, 239, 245), (self.x, self.y, 64, 64), 6)
-        self.rect = pygame.draw.rect(screen, (0, 0, 0), (self.x + 16, self.y + 16, 32, 32), 0)
+        pygame.draw.rect(screen, (0, 0, 0), (self.x + 16, self.y + 16, 32, 32), 0)
         screen.blit(self.img, (self.x, self.y))
 
     def draw_hud(self, screen):
@@ -223,8 +233,10 @@ class Player:
         screen.blit(points_font.render(self.controls_text, True, self.color), (self.hud_x, 30))
         screen.blit(huge_font.render(str(self.score), True, self.score_color), (self.score_x, 150))
 
-    # Apply one collected animal, looked up in the ANIMALS table
-    def collect(self, image_name, opponent):
+    # Apply one collected animal, looked up in the ANIMALS table. opponents
+    # is every other player, so in a one-player mode the tiger simply does
+    # nothing
+    def collect(self, image_name, opponents):
         animal_type = ANIMALS[image_name]
         effect = animal_type["effect"]
         value = animal_type["value"]
@@ -238,39 +250,73 @@ class Player:
             else:
                 self.score += value
         elif effect == "opponent":
-            opponent.score += value
+            for opponent in opponents:
+                opponent.score += value
         elif effect == "shield":
             self.shield = True
         elif effect == "random":
             # Coin flip on the value of the present
-            if random.randint(0, 1) == 0:
+            if rng.randint(0, 1) == 0:
                 self.score -= value
             else:
                 self.score += value
 
 
+# Translate held keys into one player's intent dict. This is the only place
+# the keyboard feeds the sim; anything that produces the same dict (a replay,
+# an AI, a network packet) can drive a player instead
+def keyboardIntents(pressed, controls):
+    return {direction: pressed[key] for direction, key in controls.items()}
+
+
+# Advance the whole sim one step: player movement, animal movement, recycling,
+# collisions and scoring. No drawing and no input reads - this is the function
+# a headless server would run. all_intents lines up with players by index
+def updateGame(all_intents, dt):
+    for p, intents in zip(players, all_intents):
+        p.update(intents, dt)
+    for animal in animals:
+        animal.update(dt)
+        # Replace animals that have flown off the right edge
+        if animal.x > animal.recycle_x:
+            animals.append(Animal())
+            animals.remove(animal)
+        # Check collision and calculate points
+        for p in players:
+            if p.rect.colliderect(animal.rect):
+                animal.y = 1000
+                p.collect(animal.image_name, [o for o in players if o is not p])
+
+
 # Reset everything that belongs to a single round. Called once at startup and
 # again on restart, so a starting value only ever has to be written here.
 # Anything new that should start fresh each round belongs in this function.
-def newRound():
-    global player, player2
+def newRound(seed=None):
+    global players, rng
     global scores, trophy, chosen_color
     global current_time, last_time
 
+    # Every roll the sim makes (spawns, gift coin flips, background colour)
+    # comes from this generator. Pass a seed to replay a round exactly - the
+    # hook a future server uses to make every client roll the same spawns
+    rng = random.Random(seed)
+
     # Fresh Player objects reset score, position and shield; the identity
     # arguments (controls, colours, HUD spots) are what tell the two apart
-    player = Player(player_img, start_x=200,
-                    controls={"left": pygame.K_a, "right": pygame.K_d,
-                              "up": pygame.K_w, "down": pygame.K_s},
-                    label="PLAYER 1", controls_text="WASD",
-                    color=(240, 90, 26), score_color=(181, 91, 53),
-                    hud_x=100, score_x=20)
-    player2 = Player(player2_img, start_x=700,
-                     controls={"left": pygame.K_LEFT, "right": pygame.K_RIGHT,
-                               "up": pygame.K_UP, "down": pygame.K_DOWN},
-                     label="PLAYER 2", controls_text="ARROW KEYS",
-                     color=(97, 8, 207), score_color=(125, 99, 171),
-                     hud_x=780, score_x=530)
+    players = [
+        Player(player_img, start_x=200, number=1,
+               controls={"left": pygame.K_a, "right": pygame.K_d,
+                         "up": pygame.K_w, "down": pygame.K_s},
+               controls_text="WASD",
+               color=(240, 90, 26), score_color=(181, 91, 53),
+               hud_x=100, score_x=20),
+        Player(player2_img, start_x=700, number=2,
+               controls={"left": pygame.K_LEFT, "right": pygame.K_RIGHT,
+                         "up": pygame.K_UP, "down": pygame.K_DOWN},
+               controls_text="ARROW KEYS",
+               color=(97, 8, 207), score_color=(125, 99, 171),
+               hud_x=780, score_x=530),
+    ]
 
     # Animals, at their staggered starting offsets off the left edge
     animals.clear()
@@ -286,7 +332,7 @@ def newRound():
     last_time = time.time()
 
     # Random background colour
-    chosen_color = colours[random.randint(0, len(colours) - 1)]
+    chosen_color = colours[rng.randint(0, len(colours) - 1)]
 
 
 # Each screen below owns its loop, drawing and event handling, and returns
@@ -333,7 +379,7 @@ def runGame():
     temp = pygame.time.get_ticks()
     while True:
         # Point limit to end game
-        if player.score >= point_goal or player2.score >= point_goal:
+        if any(p.score >= point_goal for p in players):
             return "end"
         # Update display
         pygame.display.flip()
@@ -350,29 +396,16 @@ def runGame():
         clock.tick(600)
         # Display scores and time
         screen.blit(timer_font.render("Time: " + str(round(current_time / 1000, 2)), True, (0, 0, 0)), (320, 30))
-        player.draw_hud(screen)
-        player2.draw_hud(screen)
-        # Draw players, updating their hitboxes; player 1 blits last, on top
-        player2.draw(screen)
-        player.draw(screen)
-        # Player movement and collide with edge of screen
-        keys = pygame.key.get_pressed()
-        player.move(keys, dt)
-        player2.move(keys, dt)
-        # Update, draw, recycle and collide each animal
+        for p in players:
+            p.draw_hud(screen)
+        # Draw players; player 1 blits last, on top
+        for p in reversed(players):
+            p.draw(screen)
+        # Read the keyboard here, then hand the sim nothing but intents
+        pressed = pygame.key.get_pressed()
+        updateGame([keyboardIntents(pressed, p.controls) for p in players], dt)
         for animal in animals:
-            animal.update(dt)
             animal.draw(screen)
-            # pygame.draw.rect(screen, (100, 100, 100), animal.rect, 4)
-            # Replace animals that have flown off the right edge
-            if animal.x > animal.recycle_x:
-                animals.append(Animal())
-                animals.remove(animal)
-            # Check collision and calculate points
-            for p, opponent in ((player, player2), (player2, player)):
-                if p.rect.colliderect(animal.rect):
-                    animal.y = 1000
-                    p.collect(animal.image_name, opponent)
         # Quit
         for event in pygame.event.get():
             if event.type == pygame.QUIT:  #or current_time/1000 > 16
@@ -396,11 +429,11 @@ def runEndScreen():
         screen.blit(points_font.render("Press r to restart", True, (220, 220, 220)), (10, 550))
         screen.blit(timer_font.render("Time: " + str(round(current_time/1000, 2)), True, (199, 199, 199)), (350, 10))
         screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
-        screen.blit(space_font.render("P1: " + str(player.score), True, player.color), (30, 30))
-        screen.blit(space_font.render("P2: " + str(player2.score), True, player2.color), (880, 30))
+        for p, corner in zip(players, ((30, 30), (880, 30))):
+            screen.blit(space_font.render("P" + str(p.number) + ": " + str(p.score), True, p.color), corner)
         # Display winner. Tested against point_goal, the same thing that ended
         # the game, so changing the goal cannot leave the winner unnamed
-        for p in (player, player2):
+        for p in players:
             if p.score >= point_goal:
                 screen.blit(space_font.render(p.label + " WINS!", True, p.color), (355, 100))
                 screen.blit(p.img, (440, 150))
