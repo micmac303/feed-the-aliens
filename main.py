@@ -366,7 +366,7 @@ def runModeSelect():
             color = (224, 185, 9) if i == selected else (120, 120, 120)
             screen.blit(space_font.render(("> " if i == selected else "   ") + m["name"], True, color), (330, 250 + i * 110))
             screen.blit(points_font.render(m["tagline"], True, color), (360, 298 + i * 110))
-        screen.blit(space_font.render("UP / DOWN to choose, SPACE to select", True, (199, 199, 199)), (180, 550))
+        screen.blit(space_font.render("UP / DOWN to choose, ENTER to select", True, (199, 199, 199)), (180, 550))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit"
@@ -378,7 +378,7 @@ def runModeSelect():
                     selected = (selected + 1) % len(MODES)
                 # Confirm: newRound() rebuilds the players list so the seat
                 # count matches the chosen mode
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_RETURN:
                     mode = MODES[selected]
                     newRound()
                     return "instructions"
