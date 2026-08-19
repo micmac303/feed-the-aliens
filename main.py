@@ -31,8 +31,26 @@ instruction_font = pygame.font.SysFont("ebrima", 38)
 space_font = pygame.font.SysFont("impact", 40)
 title_font = pygame.font.SysFont("impact", 90)
 
-# Scores
-point_goal = 100
+# A mode is one rules configuration for a round: how many players, the point
+# goal, and whether the round's time counts for the high scores. The mode
+# select screen picks one; the chosen mode persists across rounds (newRound()
+# reads it, nothing resets it). A rule that varies by mode
+# belongs in this table, not in an if somewhere - a new mode is a new entry.
+MODES = [
+    {"name": "Speed Run",
+     "tagline": "The first to 100 points wins",
+     "point_goal": 100,
+     "player_count": 2,
+     "saves_highscore": True},
+    {"name": "Adventure",
+     "tagline": "One player - levels and hazards coming soon",
+     "point_goal": 100,
+     "player_count": 1,
+     # Solo times are not comparable with two-player races, so they stay out
+     # of Highscore.txt
+     "saves_highscore": False},
+]
+mode = MODES[0]
 
 # Timer
 clock = pygame.time.Clock()
@@ -71,8 +89,9 @@ def loadScores():
         return list(default_scores)
 
 
-# Images are loaded from disk once and reused. The start screen redraws ten
-# legend images every frame, and every animal spawn needs a surface.
+# Images are loaded from disk once and reused. The instructions screen
+# redraws ten legend images every frame, and every animal spawn needs a
+# surface.
 image_cache = {}
 
 
@@ -92,8 +111,8 @@ animals = []
 
 EAGLE = "images/001-eagle.png"
 
-# What each animal does when a player collects it, and how the start screen
-# legend describes it. To add a new animal: add an entry here, add its image to
+# What each animal does when a player collects it, and how the instructions
+# screen legend describes it. To add a new animal: add an entry here, add its image to
 # one of the spawn pools below, and give it a spot in legend_layout.
 #   points   - add value to the collecting player's score
 #   obstacle - add value (negative) unless a shield absorbs it
@@ -122,8 +141,8 @@ rare_animal_images = ["images/001-star.png", EAGLE, "images/001-gift.png"]
 for name in animal_images + rare_animal_images:
     assert name in ANIMALS, "no ANIMALS entry for " + name
 
-# Where each animal sits on the start screen legend: (image, image position,
-# label position). The label text itself comes from ANIMALS.
+# Where each animal sits on the instructions screen legend: (image, image
+# position, label position). The label text itself comes from ANIMALS.
 legend_layout = [
     (EAGLE, (30, 30), (100, 40)),
     ("images/003-elephant.png", (30, 130), (100, 140)),
@@ -302,7 +321,8 @@ def newRound(seed=None):
     rng = random.Random(seed)
 
     # Fresh Player objects reset score, position and shield; the identity
-    # arguments (controls, colours, HUD spots) are what tell the two apart
+    # arguments (controls, colours, HUD spots) are what tell the two apart.
+    # The mode decides how many of these seats are actually filled
     players = [
         Player(player_img, start_x=200, number=1,
                controls={"left": pygame.K_a, "right": pygame.K_d,
@@ -316,7 +336,7 @@ def newRound(seed=None):
                controls_text="ARROW KEYS",
                color=(97, 8, 207), score_color=(125, 99, 171),
                hud_x=780, score_x=530),
-    ]
+    ][:mode["player_count"]]
 
     # Animals, at their staggered starting offsets off the left edge
     animals.clear()
@@ -336,9 +356,12 @@ def newRound(seed=None):
 
 
 # Each screen below owns its loop, drawing and event handling, and returns
-# the name of the next screen: "game", "end", "start" or "quit". The state
-# machine at the bottom of the file hops between them until one quits.
+# the name of the next screen: "start", "modes", "instructions", "game",
+# "end" or "quit". The state machine at the bottom of the file hops between
+# them until one quits. The pre-game flow is three screens:
+# title -> mode select -> instructions -> game.
 def runStartScreen():
+    title = title_font.render("Feed The Aliens", True, (199, 199, 199))
     while True:
         # Update display
         pygame.display.flip()
@@ -347,16 +370,74 @@ def runStartScreen():
         screen.blit(loadImage("images/006-ufo-1.png"), (490, -2))
         screen.blit(loadImage("images/005-alien.png"), (220, 535))
         screen.blit(loadImage("images/001-alien.png"), (660, 535))
+        # Just the title, centred, and the prompt - everything else moved to
+        # the mode select and instructions screens
+        screen.blit(title, (500 - title.get_width() // 2, 230))
+        screen.blit(space_font.render("Press SPACE to start", True, (199, 199, 199)), (340, 550))
+        for event in pygame.event.get():
+            # Quit
+            if event.type == pygame.QUIT:
+                return "quit"
+            # Continue to mode select
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    return "modes"
+
+
+def runModeSelect():
+    global mode
+
+    selected = MODES.index(mode)
+    while True:
+        # Update display
+        pygame.display.flip()
+        screen.fill((0, 0, 0))
+        heading = title_font.render("Choose a mode", True, (199, 199, 199))
+        screen.blit(heading, (500 - heading.get_width() // 2, 60))
+        # One row per mode - name plus tagline - with the selected one in gold
+        for i, m in enumerate(MODES):
+            color = (224, 185, 9) if i == selected else (120, 120, 120)
+            screen.blit(space_font.render(("> " if i == selected else "   ") + m["name"], True, color), (330, 250 + i * 110))
+            screen.blit(points_font.render(m["tagline"], True, color), (360, 298 + i * 110))
+        screen.blit(space_font.render("UP / DOWN to choose, SPACE to select", True, (199, 199, 199)), (180, 550))
+        for event in pygame.event.get():
+            # Quit
+            if event.type == pygame.QUIT:
+                return "quit"
+            if event.type == pygame.KEYDOWN:
+                # Both players' up/down keys move the highlight
+                if event.key in (pygame.K_UP, pygame.K_w):
+                    selected = (selected - 1) % len(MODES)
+                if event.key in (pygame.K_DOWN, pygame.K_s):
+                    selected = (selected + 1) % len(MODES)
+                # Confirm: newRound() rebuilds the players list so the seat
+                # count matches the chosen mode
+                if event.key == pygame.K_SPACE:
+                    mode = MODES[selected]
+                    newRound()
+                    return "instructions"
+
+
+def runInstructions():
+    while True:
+        # Update display
+        pygame.display.flip()
+        screen.fill((0, 0, 0))
+        heading = title_font.render(mode["name"], True, (199, 199, 199))
+        screen.blit(heading, (500 - heading.get_width() // 2, 15))
         # Instructions
-        screen.blit(title_font.render("Feed The Aliens", True, (199, 199, 199)), (220, 15))
         screen.blit(instruction_font.render("Collect the animals to score points", True, (97, 8, 207)), (220, 130))
         screen.blit(instruction_font.render("Avoid the trucks and bombs", True, (97, 8, 207)), (220, 180))
-        screen.blit(instruction_font.render("The first to 100 points wins", True, (97, 8, 207)), (220, 230))
+        screen.blit(instruction_font.render(mode["tagline"], True, (97, 8, 207)), (220, 230))
+        # Controls, one entry per seat, so this screen matches the mode
+        controls = "   ".join("P" + str(p.number) + ": " + p.controls_text for p in players)
+        screen.blit(space_font.render(controls, True, (199, 199, 199)), (220, 280))
         screen.blit(space_font.render("Press SPACE to start", True, (199, 199, 199)), (340, 550))
-        # Highscore
-        for i in range(0, 5):
-            screen.blit(space_font.render(str(i + 1) + "   " + str(scores[i]), True, (224, 185, 9)), (720, 340 + i * 50))
-        screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (720, 280))
+        # Highscore - shown only in modes whose times go in the table
+        if mode["saves_highscore"]:
+            screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (720, 280))
+            for i in range(0, 5):
+                screen.blit(space_font.render(str(i + 1) + "   " + str(scores[i]), True, (224, 185, 9)), (720, 340 + i * 50))
         # Animal pictures, labelled from the ANIMALS table so the legend cannot
         # drift out of step with what the animals are actually worth
         for legend_name, image_at, label_at in legend_layout:
@@ -379,7 +460,7 @@ def runGame():
     temp = pygame.time.get_ticks()
     while True:
         # Point limit to end game
-        if any(p.score >= point_goal for p in players):
+        if any(p.score >= mode["point_goal"] for p in players):
             return "end"
         # Update display
         pygame.display.flip()
@@ -431,14 +512,16 @@ def runEndScreen():
         screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
         for p, corner in zip(players, ((30, 30), (880, 30))):
             screen.blit(space_font.render("P" + str(p.number) + ": " + str(p.score), True, p.color), corner)
-        # Display winner. Tested against point_goal, the same thing that ended
-        # the game, so changing the goal cannot leave the winner unnamed
+        # Display winner. Tested against the mode's point goal, the same thing
+        # that ended the game, so changing the goal cannot leave the winner
+        # unnamed
         for p in players:
-            if p.score >= point_goal:
+            if p.score >= mode["point_goal"]:
                 screen.blit(space_font.render(p.label + " WINS!", True, p.color), (355, 100))
                 screen.blit(p.img, (440, 150))
-        # Highscores, saved once per round rather than on every frame
-        if not trophy and current_time/1000 < scores[4]:
+        # Highscores, saved once per round rather than on every frame, and
+        # only in modes whose times belong in the table
+        if mode["saves_highscore"] and not trophy and current_time/1000 < scores[4]:
             trophy = True
             # Drop the slowest time and insert this one
             scores = sorted(scores[:4] + [round(current_time/1000, 2)])
@@ -463,6 +546,10 @@ screen_name = "start"
 while screen_name != "quit":
     if screen_name == "start":
         screen_name = runStartScreen()
+    elif screen_name == "modes":
+        screen_name = runModeSelect()
+    elif screen_name == "instructions":
+        screen_name = runInstructions()
     elif screen_name == "game":
         screen_name = runGame()
     elif screen_name == "end":
