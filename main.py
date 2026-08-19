@@ -20,27 +20,6 @@ instruction_font = pygame.font.SysFont("ebrima", 38)
 space_font = pygame.font.SysFont("impact", 40)
 title_font = pygame.font.SysFont("impact", 90)
 
-# A mode is one rules configuration for a round: how many players, the point
-# goal, and whether the round's time counts for the high scores. The mode
-# select screen picks one; the chosen mode persists across rounds (newRound()
-# reads it, nothing resets it). A rule that varies by mode
-# belongs in this table, not in an if somewhere - a new mode is a new entry.
-MODES = [
-    {"name": "Speed Run",
-     "tagline": "The first to 100 points wins",
-     "point_goal": 100,
-     "player_count": 2,
-     "saves_highscore": True},
-    {"name": "Adventure",
-     "tagline": "One player - levels and hazards coming soon",
-     "point_goal": 100,
-     "player_count": 1,
-     # Solo times are not comparable with two-player races, so they stay out
-     # of Highscore.txt
-     "saves_highscore": False},
-]
-mode = MODES[0]
-
 clock = pygame.time.Clock()
 
 # Per-round state (the players list, animals, rng, scores, ...) is created by
@@ -93,64 +72,145 @@ player2_img = loadImage("images/021-ufo.png")
 
 animals = []
 
-EAGLE = "images/001-eagle.png"
-
-# What each animal does when a player collects it, and how the instructions
-# screen legend describes it. To add a new animal: add an entry here, add its image to
-# one of the spawn pools below, and give it a spot in legend_layout.
+# A level is the *content* of a round: the animals table, the spawn pools,
+# the legend layout and the point goal. The modes table further down carries
+# the *rules* (player count, highscore policy) and points at a list of
+# levels. Per the roadmap, per-level spawn scripts and hazards will hang off
+# these dicts too.
+#
+# The "animals" table maps each image path to what collecting it does and
+# how the instructions screen legend describes it:
 #   points   - add value to the collecting player's score
 #   obstacle - add value (negative) unless a shield absorbs it
 #   opponent - add value (negative) to the *other* player's score
 #   shield   - grant a single use shield
 #   random   - plus or minus value, a coin flip
-ANIMALS = {
-    "images/003-cow.png": {"effect": "points", "value": 3, "legend": "+3"},
-    "images/001-hen.png": {"effect": "points", "value": 1, "legend": "+1"},
-    "images/003-elephant.png": {"effect": "points", "value": 5, "legend": "+5"},
-    "images/002-rabbit.png": {"effect": "points", "value": 1, "legend": "+1"},
-    EAGLE: {"effect": "points", "value": 8, "legend": "+8"},
-    "images/002-truck.png": {"effect": "obstacle", "value": -5, "legend": "-5"},
-    "images/001-bomb.png": {"effect": "obstacle", "value": -2, "legend": "-2"},
-    "images/003-tiger.png": {"effect": "opponent", "value": -3, "legend": "-3 to opponent"},
-    "images/001-star.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
-    "images/001-gift.png": {"effect": "random", "value": 10, "legend": "Random +10 / -10"},
+# An entry may also carry "speed" and "recycle_x" (defaults 5 and 1100) for
+# animals that fly fast and far off the right edge before recycling.
+#
+# "legend_layout" is where each animal sits on the instructions screen:
+# (image, image position, label position). Label text comes from "animals",
+# so point values cannot drift out of step with the legend.
+#
+# To add an animal to a level: add an "animals" entry, add the path to one
+# of its spawn pools ("rare_animal_images" comes up on a 1 in 8 roll), and
+# give it a legend_layout spot. A startup assertion below fails loudly if a
+# spawnable animal has no table entry.
+CLASSIC_LEVEL = {
+    "name": None,  # Speed Run shows no level name
+    "point_goal": 100,
+    "animals": {
+        "images/003-cow.png": {"effect": "points", "value": 3, "legend": "+3"},
+        "images/001-hen.png": {"effect": "points", "value": 1, "legend": "+1"},
+        "images/003-elephant.png": {"effect": "points", "value": 5, "legend": "+5"},
+        "images/002-rabbit.png": {"effect": "points", "value": 1, "legend": "+1"},
+        "images/001-eagle.png": {"effect": "points", "value": 8, "legend": "+8",
+                                 "speed": 10, "recycle_x": 3200},
+        "images/002-truck.png": {"effect": "obstacle", "value": -5, "legend": "-5"},
+        "images/001-bomb.png": {"effect": "obstacle", "value": -2, "legend": "-2"},
+        "images/003-tiger.png": {"effect": "opponent", "value": -3, "legend": "-3 to opponent"},
+        "images/001-star.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
+        "images/001-gift.png": {"effect": "random", "value": 10, "legend": "Random +10 / -10"},
+    },
+    "animal_images": ["images/003-cow.png", "images/001-hen.png", "images/003-elephant.png",
+                      "images/002-rabbit.png", "images/001-bomb.png", "images/002-truck.png",
+                      "images/003-tiger.png"],
+    "rare_animal_images": ["images/001-star.png", "images/001-eagle.png", "images/001-gift.png"],
+    "legend_layout": [
+        ("images/001-eagle.png", (30, 30), (100, 40)),
+        ("images/003-elephant.png", (30, 130), (100, 140)),
+        ("images/003-cow.png", (30, 230), (100, 240)),
+        ("images/001-hen.png", (30, 330), (100, 340)),
+        ("images/002-rabbit.png", (30, 430), (100, 440)),
+        ("images/002-truck.png", (910, 30), (860, 40)),
+        ("images/001-bomb.png", (910, 130), (860, 140)),
+        ("images/001-gift.png", (340, 330), (420, 345)),
+        ("images/003-tiger.png", (340, 400), (420, 410)),
+        ("images/001-star.png", (340, 470), (420, 480)),
+    ],
 }
 
-# Spawn pools: rare animals come up on a 1 in 8 roll in Animal.__init__
-animal_images = ["images/003-cow.png", "images/001-hen.png", "images/003-elephant.png", "images/002-rabbit.png",
-                 "images/001-bomb.png", "images/002-truck.png", "images/003-tiger.png"]
-rare_animal_images = ["images/001-star.png", EAGLE, "images/001-gift.png"]
+# Level 1 of the Adventure world tour. The art is placeholders - existing
+# sprites standing in for the UK animals until real icons land. To swap in
+# real art: drop the PNG into images/ and rename the path in the three
+# places it appears here (animals key, spawn pool, legend row). The fox is
+# an obstacle rather than an opponent effect because Adventure is solo.
+UK_LEVEL = {
+    "name": "Level 1 - United Kingdom",
+    "point_goal": 50,
+    "animals": {
+        "images/001-hen.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
+        "images/002-rabbit.png": {"effect": "points", "value": 1, "legend": "Squirrel +1"},
+        "images/003-cow.png": {"effect": "points", "value": 3, "legend": "Sheep +3"},
+        "images/003-elephant.png": {"effect": "points", "value": 5, "legend": "Bulldog +5"},
+        "images/001-eagle.png": {"effect": "points", "value": 8, "legend": "Swan +8",
+                                 "speed": 10, "recycle_x": 3200},
+        "images/003-tiger.png": {"effect": "obstacle", "value": -3, "legend": "Fox -3"},
+        "images/002-truck.png": {"effect": "obstacle", "value": -5, "legend": "Bus -5"},
+        "images/001-bomb.png": {"effect": "obstacle", "value": -2, "legend": "Bomb -2"},
+        "images/001-star.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
+        "images/001-gift.png": {"effect": "random", "value": 10, "legend": "Random +10 / -10"},
+    },
+    "animal_images": ["images/003-cow.png", "images/001-hen.png", "images/003-elephant.png",
+                      "images/002-rabbit.png", "images/001-bomb.png", "images/002-truck.png",
+                      "images/003-tiger.png"],
+    "rare_animal_images": ["images/001-star.png", "images/001-eagle.png", "images/001-gift.png"],
+    "legend_layout": [
+        ("images/001-eagle.png", (30, 30), (100, 40)),
+        ("images/003-elephant.png", (30, 130), (100, 140)),
+        ("images/003-cow.png", (30, 230), (100, 240)),
+        ("images/001-hen.png", (30, 330), (100, 340)),
+        ("images/002-rabbit.png", (30, 430), (100, 440)),
+        ("images/002-truck.png", (910, 30), (790, 40)),
+        ("images/001-bomb.png", (910, 130), (790, 140)),
+        ("images/001-gift.png", (340, 330), (420, 345)),
+        ("images/003-tiger.png", (340, 400), (420, 410)),
+        ("images/001-star.png", (340, 470), (420, 480)),
+    ],
+}
 
-# A spawnable animal with no entry above would silently score nothing
-for name in animal_images + rare_animal_images:
-    assert name in ANIMALS, "no ANIMALS entry for " + name
+# Adventure's world tour, one country per level. France, Spain, Germany and
+# friends append here; continent chapters will group lists like this one.
+ADVENTURE_LEVELS = [UK_LEVEL]
 
-# Where each animal sits on the instructions screen legend: (image, image
-# position, label position). The label text itself comes from ANIMALS.
-legend_layout = [
-    (EAGLE, (30, 30), (100, 40)),
-    ("images/003-elephant.png", (30, 130), (100, 140)),
-    ("images/003-cow.png", (30, 230), (100, 240)),
-    ("images/001-hen.png", (30, 330), (100, 340)),
-    ("images/002-rabbit.png", (30, 430), (100, 440)),
-    ("images/002-truck.png", (910, 30), (860, 40)),
-    ("images/001-bomb.png", (910, 130), (860, 140)),
-    ("images/001-gift.png", (340, 330), (420, 345)),
-    ("images/003-tiger.png", (340, 400), (420, 410)),
-    ("images/001-star.png", (340, 470), (420, 480)),
+# A mode is one rules configuration for a round: how many players, which
+# levels, and whether the round's time counts for the high scores. The mode
+# select screen picks one; the chosen mode persists across rounds (newRound()
+# reads it, nothing resets it). A rule that varies by mode belongs in this
+# table, not in an if somewhere - a new mode is a new entry.
+MODES = [
+    {"name": "Speed Run",
+     "tagline": "The first to 100 points wins",
+     "player_count": 2,
+     "saves_highscore": True,
+     "levels": [CLASSIC_LEVEL]},
+    {"name": "Adventure",
+     "tagline": "One player - eat your way around the world",
+     "player_count": 1,
+     # Solo times are not comparable with two-player races, so they stay out
+     # of Highscore.txt
+     "saves_highscore": False,
+     "levels": ADVENTURE_LEVELS},
 ]
+mode = MODES[0]
+
+# A spawnable animal with no table entry would silently score nothing
+for m in MODES:
+    for lvl in m["levels"]:
+        for name in lvl["animal_images"] + lvl["rare_animal_images"]:
+            assert name in lvl["animals"], "no animals entry for " + name
 
 
-# One drifting animal. The type is rolled at construction: 1 in 8 spawns come
-# from the rare pool. What an animal *does* when collected stays in the
-# ANIMALS table above - the object only carries movement state and its type
-# tag, so the eagle's speed and recycle distance are set once, here.
+# One drifting animal. The type is rolled at construction from the active
+# level's pools: 1 in 8 spawns come from the rare pool. What an animal *does*
+# when collected stays in the level's animals table - the object only carries
+# movement state and its type tag.
 class Animal:
     def __init__(self, slot=0):
         if rng.randint(1, 8) == 8:
-            self.image_name = rare_animal_images[rng.randint(0, len(rare_animal_images) - 1)]
+            self.image_name = level["rare_animal_images"][rng.randint(0, len(level["rare_animal_images"]) - 1)]
         else:
-            self.image_name = animal_images[rng.randint(0, len(animal_images) - 1)]
+            self.image_name = level["animal_images"][rng.randint(0, len(level["animal_images"]) - 1)]
         # The surface is shared between animals of the same type - it is only
         # ever blitted, never drawn into - but get_rect() gives each one its
         # own hitbox
@@ -159,13 +219,12 @@ class Animal:
         # slot staggers the 27 starting animals off the left edge
         self.x = ((slot + 1) * -81) - 1000
         self.y = rng.randint(120, 500)
-        if self.image_name == EAGLE:
-            # Eagles fly fast, and far off the right edge before recycling
-            self.speed = 10
-            self.recycle_x = 3200
-        else:
-            self.speed = 5
-            self.recycle_x = 1100
+        # Most animals drift at 5 and recycle just off the right edge; the
+        # table entry can say otherwise (the eagle and the swan fly fast, and
+        # far off the edge before recycling)
+        animal_type = level["animals"][self.image_name]
+        self.speed = animal_type.get("speed", 5)
+        self.recycle_x = animal_type.get("recycle_x", 1100)
 
     def update(self, dt):
         # The hitbox syncs to the pre-move position, so a collision tracks the
@@ -236,11 +295,11 @@ class Player:
         screen.blit(points_font.render(self.controls_text, True, self.color), (self.hud_x, 30))
         screen.blit(huge_font.render(str(self.score), True, self.score_color), (self.score_x, 150))
 
-    # Apply one collected animal, looked up in the ANIMALS table. opponents
-    # is every other player, so in a one-player mode the tiger simply does
-    # nothing
+    # Apply one collected animal, looked up in the level's animals table.
+    # opponents is every other player, so in a one-player mode an opponent
+    # effect simply does nothing
     def collect(self, image_name, opponents):
-        animal_type = ANIMALS[image_name]
+        animal_type = level["animals"][image_name]
         effect = animal_type["effect"]
         value = animal_type["value"]
 
@@ -292,7 +351,7 @@ def updateGame(all_intents, dt):
 # again on restart, so a starting value only ever has to be written here.
 # Anything new that should start fresh each round belongs in this function.
 def newRound(seed=None):
-    global players, rng
+    global players, rng, level
     global scores, trophy, chosen_color
     global current_time, last_time
 
@@ -300,6 +359,12 @@ def newRound(seed=None):
     # comes from this generator. Pass a seed to replay a round exactly - the
     # hook a future server uses to make every client roll the same spawns
     rng = random.Random(seed)
+
+    # The active level supplies the round's content: spawn pools, animal
+    # effects, legend and point goal. Always the mode's first level until
+    # level progression exists - advancing will just be a bigger index. Must
+    # be set before the animals below are spawned
+    level = mode["levels"][0]
 
     # Fresh Player objects reset score, position and shield; the identity
     # arguments (controls, colours, HUD spots) are what tell the two apart.
@@ -396,8 +461,11 @@ def runInstructions():
         heading = title_font.render(mode["name"], True, (199, 199, 199))
         screen.blit(heading, (500 - heading.get_width() // 2, 15))
         screen.blit(instruction_font.render("Collect the animals to score points", True, (97, 8, 207)), (220, 130))
-        screen.blit(instruction_font.render("Avoid the trucks and bombs", True, (97, 8, 207)), (220, 180))
-        screen.blit(instruction_font.render(mode["tagline"], True, (97, 8, 207)), (220, 230))
+        screen.blit(instruction_font.render("Avoid the hazards", True, (97, 8, 207)), (220, 180))
+        # Third line: the level name when the level has one (Adventure's
+        # countries), otherwise the mode tagline
+        third_line = level["name"] or mode["tagline"]
+        screen.blit(instruction_font.render(third_line, True, (224, 185, 9) if level["name"] else (97, 8, 207)), (220, 230))
         # Controls, one entry per seat, so this screen matches the mode
         controls = "   ".join("P" + str(p.number) + ": " + p.controls_text for p in players)
         screen.blit(space_font.render(controls, True, (199, 199, 199)), (220, 280))
@@ -407,11 +475,11 @@ def runInstructions():
             screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (720, 280))
             for i in range(0, 5):
                 screen.blit(space_font.render(str(i + 1) + "   " + str(scores[i]), True, (224, 185, 9)), (720, 340 + i * 50))
-        # Animal pictures, labelled from the ANIMALS table so the legend cannot
-        # drift out of step with what the animals are actually worth
-        for legend_name, image_at, label_at in legend_layout:
+        # Animal pictures, labelled from the level's animals table so the
+        # legend cannot drift out of step with what the animals are worth
+        for legend_name, image_at, label_at in level["legend_layout"]:
             screen.blit(loadImage(legend_name), image_at)
-            screen.blit(points_font.render(ANIMALS[legend_name]["legend"], True, (199, 199, 199)), label_at)
+            screen.blit(points_font.render(level["animals"][legend_name]["legend"], True, (199, 199, 199)), label_at)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit"
@@ -425,7 +493,7 @@ def runGame():
 
     temp = pygame.time.get_ticks()
     while True:
-        if any(p.score >= mode["point_goal"] for p in players):
+        if any(p.score >= level["point_goal"] for p in players):
             return "end"
         pygame.display.flip()
         screen.fill(chosen_color)
@@ -472,11 +540,11 @@ def runEndScreen():
         screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
         for p, corner in zip(players, ((30, 30), (880, 30))):
             screen.blit(space_font.render("P" + str(p.number) + ": " + str(p.score), True, p.color), corner)
-        # Display winner. Tested against the mode's point goal, the same thing
-        # that ended the game, so changing the goal cannot leave the winner
-        # unnamed
+        # Display winner. Tested against the level's point goal, the same
+        # thing that ended the game, so changing the goal cannot leave the
+        # winner unnamed
         for p in players:
-            if p.score >= mode["point_goal"]:
+            if p.score >= level["point_goal"]:
                 screen.blit(space_font.render(p.label + " WINS!", True, p.color), (355, 100))
                 screen.blit(p.img, (440, 150))
         # Highscores, saved once per round rather than on every frame, and
