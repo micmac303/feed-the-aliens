@@ -2,28 +2,12 @@ import random
 import time
 import pygame
 
-# 29.48 31.9 33.88 34.34 34.64 (to score 200 point)
-# 11.435, 13.15, 14.301, 14.58, 14.718, 14.807, 14.517, 14.562, 14.927  (to score 100 point)
-# 6.52 6.8 6.88 7.04 7.13 (to score 30 point)
-# 1.91 2.44 2.67 3.08 3.44 (to score 1 point)
-
-# To do:
-# flash the score
-# pic of animals eaten/ counter of animals
-# reward for no lorrys/ bombs 'clean run'
-# combos e.g: five cows in a row +500
-# sound effects, music, wipeout music
-# change highscore UI
-
-# Initialise pygame
 pygame.init()
 
-# Create the screen
 screen = pygame.display.set_mode((1000, 600))
 pygame.display.set_icon(pygame.image.load("images/006-ufo-1.png"))
 pygame.display.set_caption("Feed The Aliens")
 
-# Font
 timer_font = pygame.font.SysFont("impact", 60)
 huge_font = pygame.font.SysFont("impact", 352)
 points_font = pygame.font.SysFont("impact", 32)
@@ -52,13 +36,11 @@ MODES = [
 ]
 mode = MODES[0]
 
-# Timer
 clock = pygame.time.Clock()
 
 # Per-round state (the players list, animals, rng, scores, ...) is created by
 # newRound() below, so each starting value is written in exactly one place.
 
-# Random background colour
 colours = [(49, 201, 235), (34, 52, 153), (50, 92, 166), (89, 125, 189), (89, 146, 189), (84, 180, 199),  # Blue
            (163, 11, 11), (207, 41, 41), (194, 39, 98), (199, 42, 94), (168, 5, 5), (189, 0, 126),  # Red
            (122, 0, 156), (145, 24, 196), (171, 34, 199), (77, 13, 181), (120, 76, 207), (96, 3, 171),  # Purple
@@ -70,13 +52,13 @@ colours = [(49, 201, 235), (34, 52, 153), (50, 92, 166), (89, 125, 189), (89, 14
 default_scores = [30.0, 40.0, 50.0, 60.0, 70.0]
 
 
-# Space separated list, overwriting any existing scores
 def saveScores(score_list):
     with open("Highscore.txt", "w") as scores_file:
         scores_file.write(" ".join(str(x) for x in score_list))
 
 
-# Read the five best times, recreating the file if it is missing or corrupt
+# Recreates the file if it is missing, empty, corrupt or short, so the game
+# never crashes on bad data.
 def loadScores():
     try:
         with open("Highscore.txt", "r") as scores_file:
@@ -101,10 +83,7 @@ def loadImage(path):
     return image_cache[path]
 
 
-# Player 1
 player_img = loadImage("images/001-ufo.png")
-
-# Player 2
 player2_img = loadImage("images/021-ufo.png")
 
 animals = []
@@ -274,7 +253,6 @@ class Player:
         elif effect == "shield":
             self.shield = True
         elif effect == "random":
-            # Coin flip on the value of the present
             if rng.randint(0, 1) == 0:
                 self.score -= value
             else:
@@ -296,11 +274,9 @@ def updateGame(all_intents, dt):
         p.update(intents, dt)
     for animal in animals:
         animal.update(dt)
-        # Replace animals that have flown off the right edge
         if animal.x > animal.recycle_x:
             animals.append(Animal())
             animals.remove(animal)
-        # Check collision and calculate points
         for p in players:
             if p.rect.colliderect(animal.rect):
                 animal.y = 1000
@@ -338,20 +314,16 @@ def newRound(seed=None):
                hud_x=780, score_x=530),
     ][:mode["player_count"]]
 
-    # Animals, at their staggered starting offsets off the left edge
     animals.clear()
     for i in range(0, 27):
         animals.append(Animal(slot=i))
 
-    # Highscores
     scores = loadScores()
     trophy = False
 
-    # Timer and frame rate
     current_time = 0
     last_time = time.time()
 
-    # Random background colour
     chosen_color = colours[rng.randint(0, len(colours) - 1)]
 
 
@@ -363,10 +335,8 @@ def newRound(seed=None):
 def runStartScreen():
     title = title_font.render("Feed The Aliens", True, (199, 199, 199))
     while True:
-        # Update display
         pygame.display.flip()
         screen.fill((0, 0, 0))
-        # Image decoration
         screen.blit(loadImage("images/006-ufo-1.png"), (490, -2))
         screen.blit(loadImage("images/005-alien.png"), (220, 535))
         screen.blit(loadImage("images/001-alien.png"), (660, 535))
@@ -375,10 +345,8 @@ def runStartScreen():
         screen.blit(title, (500 - title.get_width() // 2, 230))
         screen.blit(space_font.render("Press SPACE to start", True, (199, 199, 199)), (340, 550))
         for event in pygame.event.get():
-            # Quit
             if event.type == pygame.QUIT:
                 return "quit"
-            # Continue to mode select
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     return "modes"
@@ -389,7 +357,6 @@ def runModeSelect():
 
     selected = MODES.index(mode)
     while True:
-        # Update display
         pygame.display.flip()
         screen.fill((0, 0, 0))
         heading = title_font.render("Choose a mode", True, (199, 199, 199))
@@ -401,7 +368,6 @@ def runModeSelect():
             screen.blit(points_font.render(m["tagline"], True, color), (360, 298 + i * 110))
         screen.blit(space_font.render("UP / DOWN to choose, SPACE to select", True, (199, 199, 199)), (180, 550))
         for event in pygame.event.get():
-            # Quit
             if event.type == pygame.QUIT:
                 return "quit"
             if event.type == pygame.KEYDOWN:
@@ -420,12 +386,10 @@ def runModeSelect():
 
 def runInstructions():
     while True:
-        # Update display
         pygame.display.flip()
         screen.fill((0, 0, 0))
         heading = title_font.render(mode["name"], True, (199, 199, 199))
         screen.blit(heading, (500 - heading.get_width() // 2, 15))
-        # Instructions
         screen.blit(instruction_font.render("Collect the animals to score points", True, (97, 8, 207)), (220, 130))
         screen.blit(instruction_font.render("Avoid the trucks and bombs", True, (97, 8, 207)), (220, 180))
         screen.blit(instruction_font.render(mode["tagline"], True, (97, 8, 207)), (220, 230))
@@ -444,10 +408,8 @@ def runInstructions():
             screen.blit(loadImage(legend_name), image_at)
             screen.blit(points_font.render(ANIMALS[legend_name]["legend"], True, (199, 199, 199)), label_at)
         for event in pygame.event.get():
-            # Quit
             if event.type == pygame.QUIT:
                 return "quit"
-            # Continue to game
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     return "game"
@@ -456,26 +418,20 @@ def runInstructions():
 def runGame():
     global current_time, last_time
 
-    # Reset timer
     temp = pygame.time.get_ticks()
     while True:
-        # Point limit to end game
         if any(p.score >= mode["point_goal"] for p in players):
             return "end"
-        # Update display
         pygame.display.flip()
         screen.fill(chosen_color)
-        # Load frame rate
         dt = time.time() - last_time
         dt *= 60
         last_time = time.time()
         # Slow game on first frames
         if dt > 2:
             dt = 1.9
-        # Load time
         current_time = (pygame.time.get_ticks() - temp)
         clock.tick(600)
-        # Display scores and time
         screen.blit(timer_font.render("Time: " + str(round(current_time / 1000, 2)), True, (0, 0, 0)), (320, 30))
         for p in players:
             p.draw_hud(screen)
@@ -487,9 +443,8 @@ def runGame():
         updateGame([keyboardIntents(pressed, p.controls) for p in players], dt)
         for animal in animals:
             animal.draw(screen)
-        # Quit
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:  #or current_time/1000 > 16
+            if event.type == pygame.QUIT:
                 time.sleep(0.2)
                 return "quit"
 
@@ -498,15 +453,11 @@ def runEndScreen():
     global scores, trophy
 
     while True:
-        # Update display
         pygame.display.flip()
-        # End screen
         screen.fill((0, 0, 0))
-        # Highscores
         screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (775, 280))
         for i in range(0, 5):
             screen.blit(space_font.render(str(i + 1) + "   " + str(scores[i]), True, (224, 185, 9)), (775, 340 + i * 50))
-        # Decoration
         screen.blit(points_font.render("Press r to restart", True, (220, 220, 220)), (10, 550))
         screen.blit(timer_font.render("Time: " + str(round(current_time/1000, 2)), True, (199, 199, 199)), (350, 10))
         screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
@@ -523,13 +474,11 @@ def runEndScreen():
         # only in modes whose times belong in the table
         if mode["saves_highscore"] and not trophy and current_time/1000 < scores[4]:
             trophy = True
-            # Drop the slowest time and insert this one
             scores = sorted(scores[:4] + [round(current_time/1000, 2)])
             saveScores(scores)
         if trophy:
             screen.blit(space_font.render("New High Score!", True, (224, 185, 9)), (355, 380))
             screen.blit(loadImage("images/001-trophy.png"), (440, 430))
-        # Exit
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit"
