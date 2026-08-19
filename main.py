@@ -4,7 +4,12 @@ import pygame
 
 pygame.init()
 
-screen = pygame.display.set_mode((1000, 600))
+# vsync makes flip() block until the display actually refreshes, so frames
+# land exactly on the refresh cadence. Pacing with a timer instead (the old
+# clock.tick) drifts against the refresh rate and skips a frame roughly once
+# a second - visible as the whole field jumping forward. SCALED is required
+# for vsync in pygame-ce; the window looks the same.
+screen = pygame.display.set_mode((1000, 600), pygame.SCALED, vsync=1)
 pygame.display.set_icon(pygame.image.load("images/006-ufo-1.png"))
 pygame.display.set_caption("Feed The Aliens")
 
@@ -431,7 +436,11 @@ def runGame():
         if dt > 2:
             dt = 1.9
         current_time = (pygame.time.get_ticks() - temp)
-        clock.tick(600)
+        # vsync paces the loop (flip blocks until the refresh); this cap never
+        # engages alongside it and only bounds the loop if vsync is unavailable.
+        # Don't pace with tick(60) instead: its sleep drifts against the real
+        # refresh rate and skips a frame about once a second, a visible lurch
+        clock.tick(240)
         screen.blit(timer_font.render("Time: " + str(round(current_time / 1000, 2)), True, (0, 0, 0)), (320, 30))
         for p in players:
             p.draw_hud(screen)
