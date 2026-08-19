@@ -31,8 +31,26 @@ instruction_font = pygame.font.SysFont("ebrima", 38)
 space_font = pygame.font.SysFont("impact", 40)
 title_font = pygame.font.SysFont("impact", 90)
 
-# Scores
-point_goal = 100
+# A mode is one rules configuration for a round: how many players, the point
+# goal, and whether the round's time counts for the high scores. The start
+# screen cycles through MODES with the M key; the chosen mode persists across
+# rounds (newRound() reads it, nothing resets it). A rule that varies by mode
+# belongs in this table, not in an if somewhere - a new mode is a new entry.
+MODES = [
+    {"name": "Speed Run",
+     "tagline": "The first to 100 points wins",
+     "point_goal": 100,
+     "player_count": 2,
+     "saves_highscore": True},
+    {"name": "Adventure",
+     "tagline": "One player - levels and hazards coming soon",
+     "point_goal": 100,
+     "player_count": 1,
+     # Solo times are not comparable with two-player races, so they stay out
+     # of Highscore.txt
+     "saves_highscore": False},
+]
+mode = MODES[0]
 
 # Timer
 clock = pygame.time.Clock()
@@ -302,7 +320,8 @@ def newRound(seed=None):
     rng = random.Random(seed)
 
     # Fresh Player objects reset score, position and shield; the identity
-    # arguments (controls, colours, HUD spots) are what tell the two apart
+    # arguments (controls, colours, HUD spots) are what tell the two apart.
+    # The mode decides how many of these seats are actually filled
     players = [
         Player(player_img, start_x=200, number=1,
                controls={"left": pygame.K_a, "right": pygame.K_d,
@@ -316,7 +335,7 @@ def newRound(seed=None):
                controls_text="ARROW KEYS",
                color=(97, 8, 207), score_color=(125, 99, 171),
                hud_x=780, score_x=530),
-    ]
+    ][:mode["player_count"]]
 
     # Animals, at their staggered starting offsets off the left edge
     animals.clear()
@@ -339,6 +358,8 @@ def newRound(seed=None):
 # the name of the next screen: "game", "end", "start" or "quit". The state
 # machine at the bottom of the file hops between them until one quits.
 def runStartScreen():
+    global mode
+
     while True:
         # Update display
         pygame.display.flip()
@@ -351,7 +372,9 @@ def runStartScreen():
         screen.blit(title_font.render("Feed The Aliens", True, (199, 199, 199)), (220, 15))
         screen.blit(instruction_font.render("Collect the animals to score points", True, (97, 8, 207)), (220, 130))
         screen.blit(instruction_font.render("Avoid the trucks and bombs", True, (97, 8, 207)), (220, 180))
-        screen.blit(instruction_font.render("The first to 100 points wins", True, (97, 8, 207)), (220, 230))
+        screen.blit(instruction_font.render(mode["tagline"], True, (97, 8, 207)), (220, 230))
+        # Mode selector; the tagline above describes whichever mode is chosen
+        screen.blit(space_font.render("Mode: " + mode["name"] + "  (M to change)", True, (199, 199, 199)), (220, 280))
         screen.blit(space_font.render("Press SPACE to start", True, (199, 199, 199)), (340, 550))
         # Highscore
         for i in range(0, 5):
@@ -370,6 +393,11 @@ def runStartScreen():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     return "game"
+                # Cycle the mode. newRound() rebuilds the players list so the
+                # seat count matches before the round starts
+                if event.key == pygame.K_m:
+                    mode = MODES[(MODES.index(mode) + 1) % len(MODES)]
+                    newRound()
 
 
 def runGame():
@@ -379,7 +407,7 @@ def runGame():
     temp = pygame.time.get_ticks()
     while True:
         # Point limit to end game
-        if any(p.score >= point_goal for p in players):
+        if any(p.score >= mode["point_goal"] for p in players):
             return "end"
         # Update display
         pygame.display.flip()
@@ -431,14 +459,16 @@ def runEndScreen():
         screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
         for p, corner in zip(players, ((30, 30), (880, 30))):
             screen.blit(space_font.render("P" + str(p.number) + ": " + str(p.score), True, p.color), corner)
-        # Display winner. Tested against point_goal, the same thing that ended
-        # the game, so changing the goal cannot leave the winner unnamed
+        # Display winner. Tested against the mode's point goal, the same thing
+        # that ended the game, so changing the goal cannot leave the winner
+        # unnamed
         for p in players:
-            if p.score >= point_goal:
+            if p.score >= mode["point_goal"]:
                 screen.blit(space_font.render(p.label + " WINS!", True, p.color), (355, 100))
                 screen.blit(p.img, (440, 150))
-        # Highscores, saved once per round rather than on every frame
-        if not trophy and current_time/1000 < scores[4]:
+        # Highscores, saved once per round rather than on every frame, and
+        # only in modes whose times belong in the table
+        if mode["saves_highscore"] and not trophy and current_time/1000 < scores[4]:
             trophy = True
             # Drop the slowest time and insert this one
             scores = sorted(scores[:4] + [round(current_time/1000, 2)])
