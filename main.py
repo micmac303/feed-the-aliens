@@ -219,7 +219,7 @@ MODES = [
 ]
 mode = MODES[0]
 # Which of mode["levels"] is active - the campaign position for level-based
-# modes (Adventure). Reset to 0 whenever a mode is freshly chosen (runModeSelect);
+# modes (Adventure). Reset to 0 whenever a mode is freshly chosen (runStartScreen);
 # left alone on a replay (newRound() with no other change) and advanced by
 # runEndScreen's next-level key, so it survives exactly like mode does.
 level_index = 0
@@ -487,49 +487,25 @@ def newRound(seed=None):
 
 
 # Each screen below owns its loop, drawing and event handling, and returns
-# the name of the next screen: "start", "modes", "instructions", "game",
-# "end" or "quit". The state machine at the bottom of the file hops between
-# them until one quits. The pre-game flow is three screens:
-# title -> mode select -> instructions -> game.
+# the name of the next screen: "start", "instructions", "game", "end" or
+# "quit". The state machine at the bottom of the file hops between them
+# until one quits. The pre-game flow is title/mode-select (one combined
+# screen) -> instructions -> game.
 def runStartScreen():
-    title = title_font.render("Feed The Aliens", True, (199, 199, 199))
-    prompt = space_font.render("Press SPACE to start", True, (199, 199, 199))
-    # The two player UFOs, blown up to twice sprite size for the title screen
-    ufo1 = pygame.transform.smoothscale(player_img, (128, 128))
-    ufo2 = pygame.transform.smoothscale(player2_img, (128, 128))
-    while True:
-        pygame.display.flip()
-        screen.fill((0, 0, 0))
-        # Title up top, the UFOs side by side in the middle, and the prompt
-        # at the bottom - everything centred on the 1000px width
-        screen.blit(title, (500 - title.get_width() // 2, 100))
-        screen.blit(ufo1, (500 - 128 - 24, 236))
-        screen.blit(ufo2, (500 + 24, 236))
-        screen.blit(prompt, (500 - prompt.get_width() // 2, 500))
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return "quit"
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    sounds.play("menu_select")
-                    return "modes"
-
-
-def runModeSelect():
     global mode, level_index
 
     selected = MODES.index(mode)
     while True:
         pygame.display.flip()
         screen.fill((0, 0, 0))
-        heading = title_font.render("Choose a mode", True, (199, 199, 199))
-        screen.blit(heading, (500 - heading.get_width() // 2, 60))
+        title = title_font.render("Feed The Aliens", True, (199, 199, 199))
+        screen.blit(title, (500 - title.get_width() // 2, 60))
         # One row per mode - name plus tagline - with the selected one in gold
         for i, m in enumerate(MODES):
             color = (224, 185, 9) if i == selected else (120, 120, 120)
             screen.blit(space_font.render(("> " if i == selected else "   ") + m["name"], True, color), (330, 250 + i * 110))
             screen.blit(points_font.render(m["tagline"], True, color), (360, 298 + i * 110))
-        screen.blit(space_font.render("UP / DOWN to choose, ENTER to select", True, (199, 199, 199)), (180, 550))
+        screen.blit(space_font.render("UP / DOWN to choose, ENTER to start", True, (199, 199, 199)), (200, 550))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit"
@@ -543,7 +519,7 @@ def runModeSelect():
                     sounds.play("menu_move")
                 # Confirm: newRound() rebuilds the players list so the seat
                 # count matches the chosen mode
-                if event.key == pygame.K_RETURN:
+                if event.key in (pygame.K_RETURN, pygame.K_SPACE):
                     sounds.play("menu_select")
                     mode = MODES[selected]
                     # A freshly chosen mode always starts its campaign at
@@ -603,10 +579,11 @@ def runInstructions():
                 if event.key == pygame.K_SPACE:
                     sounds.play("menu_select")
                     return "game"
-                # Back to mode select, e.g. after picking a mode by accident
+                # Back to the start screen, e.g. after picking a mode by
+                # accident
                 if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                     sounds.play("menu_move")
-                    return "modes"
+                    return "start"
 
 
 def runGame():
@@ -854,8 +831,8 @@ def runEndScreen():
                 return "quit"
             if event.type == pygame.KEYDOWN:
                 # R jumps straight back to the level's instructions screen -
-                # same mode, same level, fresh round - skipping the title
-                # and mode select
+                # same mode, same level, fresh round - skipping the start
+                # screen entirely
                 if event.key == pygame.K_r:
                     sounds.play("menu_select")
                     newRound()
@@ -883,8 +860,6 @@ screen_name = "start"
 while screen_name != "quit":
     if screen_name == "start":
         screen_name = runStartScreen()
-    elif screen_name == "modes":
-        screen_name = runModeSelect()
     elif screen_name == "instructions":
         screen_name = runInstructions()
     elif screen_name == "game":
