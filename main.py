@@ -106,7 +106,7 @@ def saveProgress(mode, stars):
         progress_file.write(" ".join(str(s) for s in stars))
 
 
-# Images are loaded from disk once and reused. The instructions screen
+# Images are loaded from disk once and reused. The level-info screen
 # redraws ten legend images every frame, and every animal spawn needs a
 # surface.
 image_cache = {}
@@ -147,7 +147,7 @@ sound_events = []
 # these dicts too.
 #
 # The "animals" table maps each image path to what collecting it does and
-# how the instructions screen legend describes it:
+# how the level-info screen's legend describes it:
 #   points   - add value to the collecting player's score
 #   obstacle - add value (negative) unless a shield absorbs it
 #   opponent - add value (negative) to the *other* player's score
@@ -160,7 +160,7 @@ sound_events = []
 # "y_range" (defaults (120, 500), the field's full vertical band) to confine
 # an animal to part of it, e.g. only the top or bottom half.
 #
-# "legend_layout" is where each animal sits on the instructions screen:
+# "legend_layout" is where each animal sits on the level-info screen:
 # (image, image position, label position). Label text comes from "animals",
 # so point values cannot drift out of step with the legend.
 #
@@ -853,15 +853,24 @@ def runLevelSelect():
                     return "start"
 
 
+# Decluttered down to identity (name/flag/UFO) and a two-item menu - the
+# legend, controls and high scores used to be squeezed onto this same screen
+# but now live on their own Level Info page (runLevelInfo), reachable here.
+# Both branches finish by stacking the menu from a running cursor, so it
+# never collides with whatever the mode-specific content above drew.
 def runInstructions():
+    selected = 0  # 0 = Start Level, 1 = Level Info
+    menu_items = ["Start Level", "Level Info"]
     while True:
         pygame.display.flip()
         screen.fill((94, 94, 94))
         heading = title_font.render(mode["name"], True, (199, 199, 199))
         screen.blit(heading, (500 - heading.get_width() // 2, 15))
         if mode["player_count"] == 1:
-            # Solo layout: level name, the player's UFO and how to move, all
-            # centred down the middle; the legend keeps the side columns
+            # Solo layout: level name and the player's UFO, centred down the
+            # middle. The controls line lives on the info page with the rest
+            # of the reference material
+            cursor = 130
             name = instruction_font.render(level["name"] or mode["tagline"],
                                            True, (224, 185, 9) if level["name"] else (97, 8, 207))
             # A level can carry a flag icon (e.g. the UK's Union Jack) shown
@@ -871,55 +880,122 @@ def runInstructions():
                 row_width = flag.get_width() + 10 + name.get_width()
                 row_x = 500 - row_width // 2
                 row_h = max(flag.get_height(), name.get_height())
-                screen.blit(flag, (row_x, 130 + (row_h - flag.get_height()) // 2))
-                screen.blit(name, (row_x + flag.get_width() + 10, 130 + (row_h - name.get_height()) // 2))
+                screen.blit(flag, (row_x, cursor + (row_h - flag.get_height()) // 2))
+                screen.blit(name, (row_x + flag.get_width() + 10, cursor + (row_h - name.get_height()) // 2))
+                cursor += row_h + 15
             else:
-                screen.blit(name, (500 - name.get_width() // 2, 130))
-            screen.blit(pygame.transform.smoothscale(players[0].img, (128, 128)), (436, 195))
-            move = space_font.render(players[0].controls_text + " to move", True, (199, 199, 199))
-            screen.blit(move, (500 - move.get_width() // 2, 340))
+                screen.blit(name, (500 - name.get_width() // 2, cursor))
+                cursor += name.get_height() + 15
+            ufo = pygame.transform.smoothscale(players[0].img, (128, 128))
+            screen.blit(ufo, (500 - ufo.get_width() // 2, cursor))
+            cursor += ufo.get_height() + 12
             if level.get("landmark"):
-                # Sits in the one gap free of both the legend (which claims
-                # the shield's spot right below "to move") and the
-                # highscore table on the right - short wording is load
-                # bearing, there isn't width to spare between them (this is
-                # why it matches the HUD's shorter "Fly over X!" rather than
-                # spelling out "...to finish!" - the Sagrada Familia's name
-                # alone is long enough to reach the highscore column)
                 finish = points_font.render("Fly over " + level["landmark_name"] + "!",
                                             True, (199, 199, 199))
-                screen.blit(finish, (500 - finish.get_width() // 2, 470))
+                screen.blit(finish, (500 - finish.get_width() // 2, cursor))
+                cursor += finish.get_height() + 8
         else:
-            screen.blit(instruction_font.render("Collect the animals to score points", True, (97, 8, 207)), (220, 130))
-            screen.blit(instruction_font.render("Avoid the hazards", True, (97, 8, 207)), (220, 180))
+            # Centred like the solo branch - the left-aligned column this
+            # used to be was shaped around the legend owning the side
+            # columns, and the legend now lives on the info page instead
+            cursor = 130
+            for line in ("Collect the animals to score points", "Avoid the hazards"):
+                line_surf = instruction_font.render(line, True, (97, 8, 207))
+                screen.blit(line_surf, (500 - line_surf.get_width() // 2, cursor))
+                cursor += line_surf.get_height() + 12
             # Third line: the level name when the level has one (Adventure's
             # countries), otherwise the mode tagline
             third_line = level["name"] or mode["tagline"]
             third_surf = instruction_font.render(third_line, True, (224, 185, 9) if level["name"] else (97, 8, 207))
-            if level.get("flag"):
-                flag = loadImage(level["flag"])
-                screen.blit(flag, (220 - flag.get_width() - 10, 230 - (flag.get_height() - third_surf.get_height()) // 2))
-            screen.blit(third_surf, (220, 230))
-            # Controls, one entry per seat, so this screen matches the mode
+            flag = loadImage(level["flag"]) if level.get("flag") else None
+            if flag:
+                row_width = flag.get_width() + 10 + third_surf.get_width()
+                row_x = 500 - row_width // 2
+                row_h = max(flag.get_height(), third_surf.get_height())
+                screen.blit(flag, (row_x, cursor + (row_h - flag.get_height()) // 2))
+                screen.blit(third_surf, (row_x + flag.get_width() + 10, cursor + (row_h - third_surf.get_height()) // 2))
+                cursor += row_h + 20
+            else:
+                screen.blit(third_surf, (500 - third_surf.get_width() // 2, cursor))
+                cursor += third_surf.get_height() + 20
+            cursor += 20
+        # Start/Info menu - up/down moves the highlight, Enter/Space
+        # confirms, matching the mode-select and level-select screens
+        for i, label in enumerate(menu_items):
+            color = (224, 185, 9) if i == selected else (120, 120, 120)
+            item = space_font.render(("> " if i == selected else "   ") + label, True, color)
+            screen.blit(item, (500 - item.get_width() // 2, cursor))
+            cursor += item.get_height() + 6
+        prompt = points_font.render("ESC to go back", True, (199, 199, 199))
+        screen.blit(prompt, (500 - prompt.get_width() // 2, cursor + 8))
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return "quit"
+            if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_UP, pygame.K_w):
+                    selected = (selected - 1) % len(menu_items)
+                    sounds.play("menu_move")
+                if event.key in (pygame.K_DOWN, pygame.K_s):
+                    selected = (selected + 1) % len(menu_items)
+                    sounds.play("menu_move")
+                if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    sounds.play("menu_select")
+                    return "game" if selected == 0 else "info"
+                # Step back one screen, e.g. after picking by accident -
+                # to level select for campaign modes, else the start screen
+                if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                    sounds.play("menu_move")
+                    return "levels" if len(mode["levels"]) > 1 else "start"
+
+
+# The controls, legend and high-score table that used to live on the
+# instructions screen - split out so that screen could be decluttered to
+# just identity and a menu. Enter starts the level directly from here too,
+# since a player who came to check the numbers shouldn't have to backtrack.
+def runLevelInfo():
+    while True:
+        pygame.display.flip()
+        screen.fill((94, 94, 94))
+        cursor = 15
+        title = level["name"] or mode["name"]
+        heading = instruction_font.render(title, True, (224, 185, 9) if level["name"] else (199, 199, 199))
+        flag = loadImage(level["flag"]) if level.get("flag") else None
+        if flag:
+            row_width = flag.get_width() + 10 + heading.get_width()
+            row_x = 500 - row_width // 2
+            row_h = max(flag.get_height(), heading.get_height())
+            screen.blit(flag, (row_x, cursor + (row_h - flag.get_height()) // 2))
+            screen.blit(heading, (row_x + flag.get_width() + 10, cursor + (row_h - heading.get_height()) // 2))
+            cursor += row_h + 10
+        else:
+            screen.blit(heading, (500 - heading.get_width() // 2, cursor))
+            cursor += heading.get_height() + 10
+        # Controls, one entry per seat, so this matches the mode. Sits in the
+        # band between the heading and the legend's first middle-column row,
+        # which is the one gap free in every level's legend_layout - the side
+        # columns start at y=30 but never reach this far in from the edges
+        if mode["player_count"] == 1:
+            controls = players[0].controls_text + " to move"
+        else:
             controls = "   ".join("P" + str(p.number) + ": " + p.controls_text for p in players)
-            screen.blit(space_font.render(controls, True, (199, 199, 199)), (220, 280))
-        prompt = points_font.render("Enter to start, ESC to go back", True, (199, 199, 199))
-        screen.blit(prompt, (500 - prompt.get_width() // 2, 550))
+        controls_surf = space_font.render(controls, True, (199, 199, 199))
+        screen.blit(controls_surf, (500 - controls_surf.get_width() // 2, cursor))
+        # Animal pictures, labelled from the level's animals table so the
+        # legend cannot drift out of step with what the animals are worth
+        for legend_name, image_at, label_at in level["legend_layout"]:
+            screen.blit(loadImage(legend_name), image_at)
+            screen.blit(points_font.render(level["animals"][legend_name]["legend"], True, (199, 199, 199)), label_at)
         # Highscore - shown only in modes that keep a table. This is the
         # active level's own table (each Adventure country tracks its own
         # scores, not one shared across the whole campaign), so it changes
         # as the player steps through the campaign
         if mode["saves_highscore"]:
             ranked = rankedScores()
-            # Sits high enough that the fifth row clears the bottom prompt
             screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (720, 250))
             for i in range(0, 5):
                 screen.blit(space_font.render(str(i + 1) + "   " + formatScoreValue(ranked[i]), True, (224, 185, 9)), (720, 305 + i * 45))
-        # Animal pictures, labelled from the level's animals table so the
-        # legend cannot drift out of step with what the animals are worth
-        for legend_name, image_at, label_at in level["legend_layout"]:
-            screen.blit(loadImage(legend_name), image_at)
-            screen.blit(points_font.render(level["animals"][legend_name]["legend"], True, (199, 199, 199)), label_at)
+        prompt = points_font.render("Enter to start, ESC to go back", True, (199, 199, 199))
+        screen.blit(prompt, (500 - prompt.get_width() // 2, 550))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit"
@@ -927,11 +1003,9 @@ def runInstructions():
                 if event.key == pygame.K_RETURN:
                     sounds.play("menu_select")
                     return "game"
-                # Step back one screen, e.g. after picking by accident -
-                # to level select for campaign modes, else the start screen
                 if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                     sounds.play("menu_move")
-                    return "levels" if len(mode["levels"]) > 1 else "start"
+                    return "instructions"
 
 
 def runGame():
@@ -1281,6 +1355,8 @@ while screen_name != "quit":
         screen_name = runLevelSelect()
     elif screen_name == "instructions":
         screen_name = runInstructions()
+    elif screen_name == "info":
+        screen_name = runLevelInfo()
     elif screen_name == "game":
         screen_name = runGame()
     elif screen_name == "end":
