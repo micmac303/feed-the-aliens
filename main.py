@@ -211,21 +211,21 @@ UK_LEVEL = {
         "images/fox.png": {"effect": "points", "value": 5, "legend": "Fox +5"},
         "images/swan.png": {"effect": "points", "value": 10, "legend": "Swan +10",
                             "speed": 10, "recycle_x": 3200},
-        "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+        "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
         "images/bus.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/fox.png",
-                      "images/jet.png", "images/bus.png"],
+                      "images/jet-fighter.png", "images/bus.png"],
     "rare_animal_images": ["images/shield.png", "images/swan.png"],
     "legend_layout": [
         ("images/swan.png", (30, 30), (100, 40)),
         ("images/fox.png", (30, 130), (100, 140)),
         ("images/squirrel.png", (30, 230), (100, 240)),
         ("images/hedgehog.png", (30, 330), (100, 340)),
-        ("images/jet.png", (910, 30), (790, 40)),
+        ("images/jet-fighter.png", (910, 30), (790, 40)),
         ("images/bus.png", (910, 130), (790, 140)),
         ("images/shield.png", (340, 400), (420, 410)),
     ],
@@ -252,28 +252,29 @@ FRANCE_LEVEL = {
         "images/boar.png": {"effect": "points", "value": 5, "legend": "Boar +5"},
         "images/cockerel.png": {"effect": "points", "value": 10, "legend": "Cockerel +10",
                             "speed": 10, "recycle_x": 3200},
-        "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+        "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
         "images/paris-tram.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/boar.png",
-                      "images/jet.png", "images/paris-tram.png"],
+                      "images/jet-fighter.png", "images/paris-tram.png"],
     "rare_animal_images": ["images/shield.png", "images/cockerel.png"],
     "legend_layout": [
         ("images/cockerel.png", (30, 30), (100, 40)),
         ("images/boar.png", (30, 130), (100, 140)),
         ("images/squirrel.png", (30, 230), (100, 240)),
         ("images/hedgehog.png", (30, 330), (100, 340)),
-        ("images/jet.png", (910, 30), (790, 40)),
+        ("images/jet-fighter.png", (910, 30), (790, 40)),
         ("images/paris-tram.png", (910, 130), (790, 140)),
         ("images/shield.png", (340, 400), (420, 410)),
     ],
 }
 
 # Level 3. The same cast again, with the sparrow standing in for the
-# swan/cockerel and the boar back in its France slot.
+# swan/cockerel, the boar back in its France slot, and the wolf standing
+# in for the squirrel.
 ITALY_LEVEL = {
     "name": "Level 3 - Italy",
     "point_goal": 100,
@@ -288,25 +289,25 @@ ITALY_LEVEL = {
     "landmark_name": "the Colosseum",
     "animals": {
         "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
-        "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
+        "images/wolf.png": {"effect": "points", "value": 2, "legend": "Wolf +2"},
         "images/boar.png": {"effect": "points", "value": 5, "legend": "Boar +5"},
         "images/sparrow.png": {"effect": "points", "value": 10, "legend": "Sparrow +10",
                             "speed": 10, "recycle_x": 3200},
-        "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+        "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
         "images/rome-bus.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
-    "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/boar.png",
-                      "images/jet.png", "images/rome-bus.png"],
+    "animal_images": ["images/hedgehog.png", "images/wolf.png", "images/boar.png",
+                      "images/jet-fighter.png", "images/rome-bus.png"],
     "rare_animal_images": ["images/shield.png", "images/sparrow.png"],
     "legend_layout": [
         ("images/sparrow.png", (30, 30), (100, 40)),
         ("images/boar.png", (30, 130), (100, 140)),
-        ("images/squirrel.png", (30, 230), (100, 240)),
+        ("images/wolf.png", (30, 230), (100, 240)),
         ("images/hedgehog.png", (30, 330), (100, 340)),
-        ("images/jet.png", (910, 30), (790, 40)),
+        ("images/jet-fighter.png", (910, 30), (790, 40)),
         ("images/rome-bus.png", (910, 130), (790, 140)),
         ("images/shield.png", (340, 400), (420, 410)),
     ],
@@ -333,21 +334,21 @@ SPAIN_LEVEL = {
         "images/bull.png": {"effect": "points", "value": 5, "legend": "Bull +5"},
         "images/001-eagle.png": {"effect": "points", "value": 10, "legend": "Eagle +10",
                                  "speed": 10, "recycle_x": 3200},
-        "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+        "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
         "images/spain-train.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/bull.png",
-                      "images/jet.png", "images/spain-train.png"],
+                      "images/jet-fighter.png", "images/spain-train.png"],
     "rare_animal_images": ["images/shield.png", "images/001-eagle.png"],
     "legend_layout": [
         ("images/001-eagle.png", (30, 30), (100, 40)),
         ("images/bull.png", (30, 130), (100, 140)),
         ("images/squirrel.png", (30, 230), (100, 240)),
         ("images/hedgehog.png", (30, 330), (100, 340)),
-        ("images/jet.png", (910, 30), (790, 40)),
+        ("images/jet-fighter.png", (910, 30), (790, 40)),
         ("images/spain-train.png", (910, 130), (790, 140)),
         ("images/shield.png", (340, 400), (420, 410)),
     ],
@@ -828,7 +829,7 @@ def runLevelSelect():
 def runInstructions():
     while True:
         pygame.display.flip()
-        screen.fill((0, 0, 0))
+        screen.fill((94, 94, 94))
         heading = title_font.render(mode["name"], True, (199, 199, 199))
         screen.blit(heading, (500 - heading.get_width() // 2, 15))
         if mode["player_count"] == 1:
