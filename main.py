@@ -957,7 +957,12 @@ def runEndScreen():
     # crossing the goal, so this is the real win/lose split. Crashing into
     # the landmark overrides all of that - it's an automatic fail no matter
     # the score, the same way "hitting" rather than "flying over" was meant
-    reached_goal = not landmark_crashed and any(p.score >= level["point_goal"] for p in players)
+    # to. Likewise, running out of lives after already crossing the goal
+    # (Adventure keeps the round going past point_goal) is still a fail.
+    reached_goal = not landmark_crashed and any(
+        p.score >= level["point_goal"] and (p.lives is None or p.lives > 0)
+        for p in players
+    )
     next_index = level_index + 1
     has_next = next_index < len(mode["levels"])
 
