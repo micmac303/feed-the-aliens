@@ -185,6 +185,10 @@ UK_LEVEL = {
     "time_limit": 30,
     # A fixed background instead of newRound()'s random pick
     "background_color": (255, 255, 255),
+    # Optional - the in-game score and timer text colour; default is the
+    # player's own colour for the score and black for the timer
+    "score_color": (34, 52, 153),
+    "timer_color": (34, 52, 153),
     # Optional - shown next to the level name on instructions and next to
     # the timer in game. Levels without a flag simply don't set this key
     "flag": "images/uk.png",
@@ -225,7 +229,10 @@ FRANCE_LEVEL = {
     "name": "Level 2 - France",
     "point_goal": 100,
     "time_limit": 30,
-    "background_color": (255, 255, 255),
+    # Navy, like the France football kit, rather than the UK's white
+    "background_color": (16, 34, 77),
+    "score_color": (239, 65, 53),
+    "timer_color": (255, 255, 255),
     "flag": "images/france.png",
     "landmark": "images/eiffel-tower.png",
     "landmark_name": "the Eiffel Tower",
@@ -432,7 +439,8 @@ class Player:
         # (drawn in runGame), lives top right - so no player label, no
         # controls reminder and no giant background score
         if len(players) == 1:
-            screen.blit(space_font.render(str(self.score), True, self.score_color), (20, 5))
+            score_color = level.get("score_color", self.score_color)
+            screen.blit(space_font.render(str(self.score), True, score_color), (20, 5))
         else:
             screen.blit(points_font.render(self.label, True, self.color), (self.hud_x, 0))
             screen.blit(points_font.render(self.controls_text, True, self.color), (self.hud_x, 30))
@@ -855,8 +863,9 @@ def runGame():
             live_time = "Fly to " + level["landmark_name"] + "!"
         elif level.get("time_limit") is not None:
             live_time += "/" + str(level["time_limit"])
+        timer_color = level.get("timer_color", (0, 0, 0))
         if mode["player_count"] == 1:
-            t = space_font.render(live_time, True, (0, 0, 0))
+            t = space_font.render(live_time, True, timer_color)
             # A level's flag (e.g. the UK's Union Jack) sits beside its
             # timer too, as a centred pair
             if level.get("flag"):
@@ -869,7 +878,7 @@ def runGame():
             else:
                 screen.blit(t, (500 - t.get_width() // 2, 5))
         else:
-            time_surf = timer_font.render(("" if landmark else "Time: ") + live_time, True, (0, 0, 0))
+            time_surf = timer_font.render(("" if landmark else "Time: ") + live_time, True, timer_color)
             if level.get("flag"):
                 flag = loadImage(level["flag"])
                 screen.blit(flag, (320 - flag.get_width() - 10, 30 - (flag.get_height() - time_surf.get_height()) // 2))
@@ -991,7 +1000,8 @@ def runEndScreen():
                 screen.blit(sub, (500 - sub.get_width() // 2, cursor))
                 cursor += sub.get_height() + 10
             # The score is the headline: big, centred, in the player's colour
-            score_surf = score_font.render(str(players[0].score), True, players[0].score_color)
+            score_surf = score_font.render(str(players[0].score),
+                                           True, level.get("score_color", players[0].score_color))
             screen.blit(score_surf, (500 - score_surf.get_width() // 2, cursor))
             cursor += score_surf.get_height() + 10
             # The star rating: earned stars bright, the rest ghosted, so
