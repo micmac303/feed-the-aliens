@@ -183,11 +183,13 @@ UK_LEVEL = {
     "name": "Level 1 - United Kingdom",
     "point_goal": 100,
     "time_limit": 30,
+    # 2-star threshold; defaults to double point_goal when unset
+    "two_star_score": 150,
     # A fixed background instead of newRound()'s random pick
     "background_color": (255, 255, 255),
     # Optional - the in-game score and timer text colour; default is the
     # player's own colour for the score and black for the timer
-    "score_color": (34, 52, 153),
+    "score_color": (200, 16, 46),
     "timer_color": (34, 52, 153),
     # Optional - shown next to the level name on instructions and next to
     # the timer in game. Levels without a flag simply don't set this key
@@ -229,6 +231,7 @@ FRANCE_LEVEL = {
     "name": "Level 2 - France",
     "point_goal": 100,
     "time_limit": 30,
+    "two_star_score": 150,
     # Navy, like the France football kit, rather than the UK's white
     "background_color": (16, 34, 77),
     "score_color": (239, 65, 53),
@@ -932,13 +935,14 @@ def runEndScreen():
     next_index = level_index + 1
     has_next = next_index < len(mode["levels"])
 
-    # Star rating, all derived from the level's own goal so new levels
-    # inherit the rule: 1 star for reaching it, 2 for doubling it, 3 for
-    # doubling it without losing a life
+    # Star rating: 1 for reaching the goal, 2 for reaching two_star_score,
+    # 3 for reaching it without losing a life. two_star_score defaults to
+    # double the goal so a level that doesn't set it still gets a sensible
+    # threshold; UK and France both set it explicitly to 150
     stars = 0
     if mode["player_count"] == 1 and reached_goal:
         stars = 1
-        if players[0].score >= 2 * level["point_goal"]:
+        if players[0].score >= level.get("two_star_score", 2 * level["point_goal"]):
             stars = 2
             if players[0].lives == mode["lives"]:
                 stars = 3
