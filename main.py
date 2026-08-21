@@ -602,21 +602,29 @@ def runGame():
 
     temp = pygame.time.get_ticks()
     paused = False
+    # The engine hum runs for exactly as long as this screen does - every
+    # return below stops it
+    sounds.start_hum()
     while True:
         # Some modes end the instant the goal is hit (Speed Run's race);
         # others let the player keep scoring against it (Adventure's chase)
         if mode["ends_on_goal"] and any(p.score >= level["point_goal"] for p in players):
+            sounds.stop_hum()
             return "end"
         # Out of lives ends the round too - but only after the explosion has
         # played out, so the player sees the blast before the end screen
         if any(p.lives is not None and p.lives <= 0 and p.explosion_timer <= 0 for p in players):
+            sounds.stop_hum()
             return "end"
         # A level can cap the round length; running out is also game over
         if level.get("time_limit") is not None and current_time / 1000 >= level["time_limit"]:
+            sounds.stop_hum()
             return "end"
         pygame.display.flip()
         screen.fill(chosen_color)
         if paused:
+            # A frozen field gets a silent engine too
+            sounds.set_hum_level("paused")
             # Freeze the round: slide the timer's start point forward so
             # paused time never counts, and keep last_time fresh so dt does
             # not jump on resume. The field still draws, it just never moves
@@ -658,7 +666,10 @@ def runGame():
         if not paused:
             # Read the keyboard here, then hand the sim nothing but intents
             pressed = pygame.key.get_pressed()
-            updateGame([keyboardIntents(pressed, p.controls) for p in players], dt)
+            all_intents = [keyboardIntents(pressed, p.controls) for p in players]
+            # The engine swells while any UFO is under thrust
+            sounds.set_hum_level("moving" if any(any(i.values()) for i in all_intents) else "idle")
+            updateGame(all_intents, dt)
             # Play whatever the sim step emitted - sound stays out of the sim
             for name in sound_events:
                 sounds.play(name)
@@ -670,6 +681,7 @@ def runGame():
             screen.blit(banner, (500 - banner.get_width() // 2, 280))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                sounds.stop_hum()
                 time.sleep(0.2)
                 return "quit"
             if event.type == pygame.KEYDOWN:
@@ -679,6 +691,7 @@ def runGame():
                 # ESC quits, but only from the pause screen so a stray
                 # keypress mid-game cannot end the round
                 if event.key == pygame.K_ESCAPE and paused:
+                    sounds.stop_hum()
                     return "quit"
 
 

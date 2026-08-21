@@ -7,7 +7,6 @@
 - Pic of animals eaten / counter of animals
 - Reward for no lorrys/bombs ('clean run')
 - Combos, e.g. five cows in a row +500
-- Music, wipeout music (sound effects done — synthesised chiptune in sounds.py)
 - Change highscore UI
 
 ## Playtest timings (Speed Run)

@@ -24,6 +24,13 @@ _rand = random.Random()
 _rate = 44100
 _sounds = {}
 
+# The UFO engine hum loops forever on its own reserved channel, so one-shot
+# effects can never steal it
+_hum = None
+_hum_channel = None
+
+_HUM_LEVELS = {"paused": 0.0, "idle": 0.6, "moving": 1.0}
+
 
 def _to_sound(samples):
     # The mixer wants interleaved int16 frames, one value per channel
@@ -74,6 +81,22 @@ def _noise(dur, volume, brightness):
     return out
 
 
+def _hum_samples():
+    # A 2s engine drone: 110Hz plus two harmonics, throbbing gently at 6Hz.
+    # Keep the fundamental at 110Hz or above - an earlier 55Hz version was
+    # inaudible on laptop speakers, which cannot reproduce anything that
+    # low. Every frequency fits the loop a whole number of times, so the
+    # loop point is seamless - no click, no beat skip
+    out = []
+    for i in range(_rate * 2):
+        t = i / _rate
+        s = (math.sin(2 * math.pi * 110 * t)
+             + 0.6 * math.sin(2 * math.pi * 220 * t)
+             + 0.3 * math.sin(2 * math.pi * 330 * t))
+        out.append(s * (0.7 + 0.3 * math.sin(2 * math.pi * 6 * t)) * 0.28)
+    return out
+
+
 def init():
     """Build every effect. A missing or failed mixer leaves the table empty."""
     global _rate, _sounds
@@ -111,9 +134,34 @@ def init():
     _sounds = {name: [_to_sound(s) for s in variants]
                for name, variants in build.items()}
 
+    # The first channel is held back for the hum loop; one-shot effects
+    # pick from the remaining seven
+    global _hum, _hum_channel
+    pygame.mixer.set_reserved(1)
+    _hum_channel = pygame.mixer.Channel(0)
+    _hum = _to_sound(_hum_samples())
+
 
 def play(name):
     """Play one effect by name; unknown names and a silent mixer are no-ops."""
     variants = _sounds.get(name)
     if variants:
         _rand.choice(variants).play()
+
+
+def start_hum():
+    """Start the UFO engine drone (runGame owns its lifetime)."""
+    if _hum is not None:
+        _hum_channel.set_volume(_HUM_LEVELS["idle"])
+        _hum_channel.play(_hum, loops=-1)
+
+
+def stop_hum():
+    if _hum_channel is not None:
+        _hum_channel.stop()
+
+
+def set_hum_level(name):
+    """"paused" (silent), "idle", or "moving" (the hum swells under thrust)."""
+    if _hum_channel is not None:
+        _hum_channel.set_volume(_HUM_LEVELS[name])
