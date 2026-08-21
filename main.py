@@ -495,6 +495,10 @@ def runStartScreen():
     global mode, level_index
 
     selected = MODES.index(mode)
+    # The two player UFOs, blown up to twice sprite size, flanking the
+    # bottom of the screen below the mode list
+    ufo1 = pygame.transform.smoothscale(player_img, (128, 128))
+    ufo2 = pygame.transform.smoothscale(player2_img, (128, 128))
     while True:
         pygame.display.flip()
         screen.fill((0, 0, 0))
@@ -505,7 +509,8 @@ def runStartScreen():
             color = (224, 185, 9) if i == selected else (120, 120, 120)
             screen.blit(space_font.render(("> " if i == selected else "   ") + m["name"], True, color), (330, 250 + i * 110))
             screen.blit(points_font.render(m["tagline"], True, color), (360, 298 + i * 110))
-        screen.blit(space_font.render("UP / DOWN to choose, ENTER to start", True, (199, 199, 199)), (200, 550))
+        screen.blit(ufo1, (500 - 128 - 24, 455))
+        screen.blit(ufo2, (500 + 24, 455))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit"
