@@ -2,7 +2,14 @@ import random
 import time
 import pygame
 
+import sounds
+
+# A small mixer buffer keeps effects snappy (a big one plays them noticeably
+# after the collision they belong to); must be set before pygame.init()
+pygame.mixer.pre_init(44100, -16, 2, 512)
 pygame.init()
+# Synthesise every effect up front; with no audio device the game runs silent
+sounds.init()
 
 # vsync makes flip() block until the display actually refreshes, so frames
 # land exactly on the refresh cadence. Pacing with a timer instead (the old
@@ -71,6 +78,13 @@ player_img = loadImage("images/001-ufo.png")
 player2_img = loadImage("images/021-ufo.png")
 
 animals = []
+
+# Sound events the sim emits, one name per thing that happened ("collect",
+# "explosion", ...). The sim only ever appends names here - it never touches
+# the mixer - and runGame() drains the list after each sim step and plays
+# them, so a headless server can forward or ignore the same list. Cleared in
+# newRound() so a fresh round never replays a dead round's leftovers.
+sound_events = []
 
 # A level is the *content* of a round: the animals table, the spawn pools,
 # the legend layout and the point goal. The modes table further down carries
@@ -340,30 +354,40 @@ class Player:
 
         if effect == "points":
             self.score += value
+            # Big hauls (the swan, the eagle) sound richer than +1 blips
+            sound_events.append("collect_big" if value >= 5 else "collect")
         elif effect == "obstacle":
             # A shield absorbs one hit instead of the player taking the penalty
             if self.shield:
                 self.shield = False
+                sound_events.append("shield_break")
             else:
                 self.score += value
+                sound_events.append("hurt")
         elif effect == "opponent":
             for opponent in opponents:
                 opponent.score += value
+            sound_events.append("zap")
         elif effect == "deadly":
             # A shield saves the life; otherwise the UFO blows up. The round
             # ends in runGame() once lives hit 0 and the explosion has played
             if self.shield:
                 self.shield = False
+                sound_events.append("shield_break")
             elif self.lives is not None:
                 self.lives -= 1
                 self.explosion_timer = 50
+                sound_events.append("explosion")
         elif effect == "shield":
             self.shield = True
+            sound_events.append("shield_up")
         elif effect == "random":
             if rng.randint(0, 1) == 0:
                 self.score -= value
+                sound_events.append("hurt")
             else:
                 self.score += value
+                sound_events.append("collect_big" if value >= 5 else "collect")
 
 
 # Translate held keys into one player's intent dict. This is the only place
@@ -441,6 +465,8 @@ def newRound(seed=None):
     for i in range(0, 27):
         animals.append(Animal(slot=i))
 
+    sound_events.clear()
+
     scores = loadScores(mode["highscore_file"], mode["default_scores"])
     trophy = False
 
@@ -477,6 +503,7 @@ def runStartScreen():
                 return "quit"
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
+                    sounds.play("menu_select")
                     return "modes"
 
 
@@ -502,11 +529,14 @@ def runModeSelect():
                 # Both players' up/down keys move the highlight
                 if event.key in (pygame.K_UP, pygame.K_w):
                     selected = (selected - 1) % len(MODES)
+                    sounds.play("menu_move")
                 if event.key in (pygame.K_DOWN, pygame.K_s):
                     selected = (selected + 1) % len(MODES)
+                    sounds.play("menu_move")
                 # Confirm: newRound() rebuilds the players list so the seat
                 # count matches the chosen mode
                 if event.key == pygame.K_RETURN:
+                    sounds.play("menu_select")
                     mode = MODES[selected]
                     newRound()
                     return "instructions"
@@ -559,9 +589,11 @@ def runInstructions():
                 return "quit"
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
+                    sounds.play("menu_select")
                     return "game"
                 # Back to mode select, e.g. after picking a mode by accident
                 if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                    sounds.play("menu_move")
                     return "modes"
 
 
@@ -627,6 +659,10 @@ def runGame():
             # Read the keyboard here, then hand the sim nothing but intents
             pressed = pygame.key.get_pressed()
             updateGame([keyboardIntents(pressed, p.controls) for p in players], dt)
+            # Play whatever the sim step emitted - sound stays out of the sim
+            for name in sound_events:
+                sounds.play(name)
+            sound_events.clear()
         for animal in animals:
             animal.draw(screen)
         if paused:
@@ -639,6 +675,7 @@ def runGame():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_p:
                     paused = not paused
+                    sounds.play("menu_move")
                 # ESC quits, but only from the pause screen so a stray
                 # keypress mid-game cannot end the round
                 if event.key == pygame.K_ESCAPE and paused:
@@ -648,6 +685,7 @@ def runGame():
 def runEndScreen():
     global scores, trophy
 
+    played_jingle = False
     while True:
         pygame.display.flip()
         screen.fill((0, 0, 0))
@@ -699,6 +737,17 @@ def runEndScreen():
         if trophy:
             screen.blit(space_font.render("New High Score!", True, (224, 185, 9)), (355, 380))
             screen.blit(loadImage("images/001-trophy.png"), (440, 430))
+        # One jingle as the screen appears, chosen after the trophy check
+        # just above so a record run gets the fanfare instead of the plain
+        # win jingle; running out of lives gets the sad one
+        if not played_jingle:
+            played_jingle = True
+            if trophy:
+                sounds.play("trophy")
+            elif any(p.lives is not None and p.lives <= 0 for p in players):
+                sounds.play("jingle_lose")
+            else:
+                sounds.play("jingle_win")
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit"
@@ -706,11 +755,13 @@ def runEndScreen():
                 # R jumps straight back to the level's instructions screen -
                 # same mode, fresh round - skipping the title and mode select
                 if event.key == pygame.K_r:
+                    sounds.play("menu_select")
                     newRound()
                     return "instructions"
                 # M leaves the round behind for the title screen; the mode
                 # gets rebuilt fresh once a mode is chosen there again
                 if event.key == pygame.K_m:
+                    sounds.play("menu_select")
                     return "start"
                 if event.key == pygame.K_q:
                     return "quit"
