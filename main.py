@@ -88,7 +88,9 @@ animals = []
 #   deadly   - the player explodes and loses a life (a shield absorbs the
 #              hit); only meaningful in modes that grant lives
 # An entry may also carry "speed" and "recycle_x" (defaults 5 and 1100) for
-# animals that fly fast and far off the right edge before recycling.
+# animals that fly fast and far off the right edge before recycling, and
+# "y_range" (defaults (120, 500), the field's full vertical band) to confine
+# an animal to part of it, e.g. only the top or bottom half.
 #
 # "legend_layout" is where each animal sits on the instructions screen:
 # (image, image position, label position). Label text comes from "animals",
@@ -143,8 +145,9 @@ UK_LEVEL = {
         "images/swan.png": {"effect": "points", "value": 10, "legend": "Swan +10",
                             "speed": 10, "recycle_x": 3200},
         "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "speed": 12, "recycle_x": 3200},
-        "images/bus.png": {"effect": "deadly", "value": None, "legend": "-1 life"},
+                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+        "images/bus.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "y_range": (310, 500)},
         "images/001-star.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/fox.png",
@@ -213,11 +216,15 @@ class Animal:
         self.rect = self.img.get_rect()
         # slot staggers the 27 starting animals off the left edge
         self.x = ((slot + 1) * -81) - 1000
-        self.y = rng.randint(120, 500)
+        animal_type = level["animals"][self.image_name]
+        # Most animals spawn anywhere in the field's vertical band; the table
+        # entry can restrict that (the jet only flies the top half, the bus
+        # only the bottom half)
+        min_y, max_y = animal_type.get("y_range", (120, 500))
+        self.y = rng.randint(min_y, max_y)
         # Most animals drift at 5 and recycle just off the right edge; the
         # table entry can say otherwise (the eagle and the swan fly fast, and
         # far off the edge before recycling)
-        animal_type = level["animals"][self.image_name]
         self.speed = animal_type.get("speed", 5)
         self.recycle_x = animal_type.get("recycle_x", 1100)
 
