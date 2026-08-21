@@ -137,7 +137,11 @@ CLASSIC_LEVEL = {
 # Level 1 of the Adventure world tour. All art is the real UK set.
 UK_LEVEL = {
     "name": "Level 1 - United Kingdom",
-    "point_goal": 50,
+    "point_goal": 100,
+    "time_limit": 60,
+    # A fixed background instead of newRound()'s random pick - reuses one of
+    # the game's existing purple tones for a mid purple that still matches
+    "background_color": (120, 76, 207),
     "animals": {
         "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
         "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
@@ -435,7 +439,9 @@ def newRound(seed=None):
     current_time = 0
     last_time = time.time()
 
-    chosen_color = colours[rng.randint(0, len(colours) - 1)]
+    # A level can pin the background to a fixed colour; otherwise each round
+    # gets a random one, same as always
+    chosen_color = level.get("background_color") or colours[rng.randint(0, len(colours) - 1)]
 
 
 # Each screen below owns its loop, drawing and event handling, and returns
@@ -559,6 +565,9 @@ def runGame():
         # played out, so the player sees the blast before the end screen
         if any(p.lives is not None and p.lives <= 0 and p.explosion_timer <= 0 for p in players):
             return "end"
+        # A level can cap the round length; running out is also game over
+        if level.get("time_limit") is not None and current_time / 1000 >= level["time_limit"]:
+            return "end"
         pygame.display.flip()
         screen.fill(chosen_color)
         if paused:
@@ -643,6 +652,10 @@ def runEndScreen():
             elif p.lives is not None and p.lives <= 0:
                 screen.blit(space_font.render("OUT OF LIVES!", True, p.color), (355, 100))
                 screen.blit(loadImage("images/explosion.png"), (440, 150))
+            # Or a level's time limit could have run out first
+            elif level.get("time_limit") is not None and current_time / 1000 >= level["time_limit"]:
+                screen.blit(space_font.render("TIME'S UP!", True, p.color), (355, 100))
+                screen.blit(p.img, (440, 150))
         # Highscores, saved once per round rather than on every frame, and
         # only in modes whose times belong in the table
         if mode["saves_highscore"] and not trophy and current_time/1000 < scores[4]:
