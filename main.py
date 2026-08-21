@@ -620,7 +620,7 @@ def runEndScreen():
         screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (775, 280))
         for i in range(0, 5):
             screen.blit(space_font.render(str(i + 1) + "   " + str(scores[i]), True, (224, 185, 9)), (775, 340 + i * 50))
-        screen.blit(points_font.render("Press R to play again, M for main menu", True, (220, 220, 220)), (10, 550))
+        screen.blit(points_font.render("Press R to play again, M for main menu, Q to quit", True, (220, 220, 220)), (10, 550))
         screen.blit(timer_font.render("Time: " + str(round(current_time/1000, 2)), True, (199, 199, 199)), (350, 10))
         screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
         for p, corner in zip(players, ((30, 30), (880, 30))):
@@ -658,6 +658,8 @@ def runEndScreen():
                 # gets rebuilt fresh once a mode is chosen there again
                 if event.key == pygame.K_m:
                     return "start"
+                if event.key == pygame.K_q:
+                    return "quit"
 
 
 newRound()
