@@ -312,9 +312,50 @@ ITALY_LEVEL = {
     ],
 }
 
-# Adventure's world tour, one country per level. Spain, Germany and
-# friends append here; continent chapters will group lists like this one.
-ADVENTURE_LEVELS = [UK_LEVEL, FRANCE_LEVEL, ITALY_LEVEL]
+# Level 4. The eagle takes the rare fast 10-point slot, the bull the common
+# 5-point slot, and the Spain train is the lower-half hazard (jet keeps the
+# upper half).
+SPAIN_LEVEL = {
+    "name": "Level 4 - Spain",
+    "point_goal": 100,
+    "time_limit": 30,
+    "two_star_score": 150,
+    "three_star_score": 175,
+    "background_color": (198, 11, 30),
+    "score_color": (255, 196, 0),
+    "timer_color": (255, 255, 255),
+    "flag": "images/spain.png",
+    "landmark": "images/sagrada-familia.png",
+    "landmark_name": "the Sagrada Familia",
+    "animals": {
+        "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
+        "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
+        "images/bull.png": {"effect": "points", "value": 5, "legend": "Bull +5"},
+        "images/001-eagle.png": {"effect": "points", "value": 10, "legend": "Eagle +10",
+                                 "speed": 10, "recycle_x": 3200},
+        "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+        "images/spain-train.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "y_range": (310, 500)},
+        "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
+    },
+    "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/bull.png",
+                      "images/jet.png", "images/spain-train.png"],
+    "rare_animal_images": ["images/shield.png", "images/001-eagle.png"],
+    "legend_layout": [
+        ("images/001-eagle.png", (30, 30), (100, 40)),
+        ("images/bull.png", (30, 130), (100, 140)),
+        ("images/squirrel.png", (30, 230), (100, 240)),
+        ("images/hedgehog.png", (30, 330), (100, 340)),
+        ("images/jet.png", (910, 30), (790, 40)),
+        ("images/spain-train.png", (910, 130), (790, 140)),
+        ("images/shield.png", (340, 400), (420, 410)),
+    ],
+}
+
+# Adventure's world tour, one country per level. Germany and friends
+# append here; continent chapters will group lists like this one.
+ADVENTURE_LEVELS = [UK_LEVEL, FRANCE_LEVEL, ITALY_LEVEL, SPAIN_LEVEL]
 
 # A mode is one rules configuration for a round: how many players, which
 # levels, and whether the round's time counts for the high scores. The mode
