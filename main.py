@@ -272,9 +272,49 @@ FRANCE_LEVEL = {
     ],
 }
 
+# Level 3. The same cast again, with the stallion standing in for the
+# swan/cockerel and the fox back in its UK slot. No landmark yet - there's
+# no Italian landmark art, so the clock just ends the round like it used to
+# before landmarks existed.
+ITALY_LEVEL = {
+    "name": "Level 3 - Italy",
+    "point_goal": 100,
+    "time_limit": 30,
+    "two_star_score": 150,
+    "three_star_score": 175,
+    "background_color": (0, 146, 70),
+    "score_color": (255, 255, 255),
+    "timer_color": (206, 43, 55),
+    "flag": "images/italy.png",
+    "animals": {
+        "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
+        "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
+        "images/fox.png": {"effect": "points", "value": 5, "legend": "Fox +5"},
+        "images/stallion.png": {"effect": "points", "value": 10, "legend": "Stallion +10",
+                            "speed": 10, "recycle_x": 3200},
+        "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+        "images/rome-bus.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "y_range": (310, 500)},
+        "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
+    },
+    "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/fox.png",
+                      "images/jet.png", "images/rome-bus.png"],
+    "rare_animal_images": ["images/shield.png", "images/stallion.png"],
+    "legend_layout": [
+        ("images/stallion.png", (30, 30), (100, 40)),
+        ("images/fox.png", (30, 130), (100, 140)),
+        ("images/squirrel.png", (30, 230), (100, 240)),
+        ("images/hedgehog.png", (30, 330), (100, 340)),
+        ("images/jet.png", (910, 30), (790, 40)),
+        ("images/rome-bus.png", (910, 130), (790, 140)),
+        ("images/shield.png", (340, 400), (420, 410)),
+    ],
+}
+
 # Adventure's world tour, one country per level. Spain, Germany and
 # friends append here; continent chapters will group lists like this one.
-ADVENTURE_LEVELS = [UK_LEVEL, FRANCE_LEVEL]
+ADVENTURE_LEVELS = [UK_LEVEL, FRANCE_LEVEL, ITALY_LEVEL]
 
 # A mode is one rules configuration for a round: how many players, which
 # levels, and whether the round's time counts for the high scores. The mode
