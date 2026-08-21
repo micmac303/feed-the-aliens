@@ -1,8 +1,5 @@
 # To do
 
-- Real art for the UK animals — UK_LEVEL in main.py uses stand-in sprites
-  (hen=hedgehog, rabbit=squirrel, cow=sheep, elephant=bulldog, eagle=swan,
-  tiger=fox, truck=double-decker bus); same flat-icon style as images/
 - Flash the score
 - Pic of animals eaten / counter of animals
 - Reward for no lorrys/bombs ('clean run')

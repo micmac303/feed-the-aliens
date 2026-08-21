@@ -63,6 +63,27 @@ def loadScores(path, defaults):
         return list(defaults)
 
 
+# Campaign progress is player data too (gitignored like the highscores):
+# one star count (0-3) per level, space-separated, aligned with the mode's
+# levels list. 0 = never completed; 1+ = completed, so the next level is
+# unlocked. Missing/corrupt/short files degrade to zeros, and the list is
+# padded to the level count so newly added levels appear as uncompleted.
+def loadProgress(mode):
+    if not mode.get("progress_file"):
+        return [0] * len(mode["levels"])
+    try:
+        with open(mode["progress_file"], "r") as progress_file:
+            stars = [min(max(int(x), 0), 3) for x in progress_file.read().split()]
+    except (OSError, ValueError):
+        stars = []
+    return (stars + [0] * len(mode["levels"]))[:len(mode["levels"])]
+
+
+def saveProgress(mode, stars):
+    with open(mode["progress_file"], "w") as progress_file:
+        progress_file.write(" ".join(str(s) for s in stars))
+
+
 # Images are loaded from disk once and reused. The instructions screen
 # redraws ten legend images every frame, and every animal spawn needs a
 # surface.
@@ -185,9 +206,43 @@ UK_LEVEL = {
     ],
 }
 
-# Adventure's world tour, one country per level. France, Spain, Germany and
+# Level 2. The same cast as the UK, with the cockerel - France's national
+# symbol - standing in for the fox.
+FRANCE_LEVEL = {
+    "name": "Level 2 - France",
+    "point_goal": 100,
+    "time_limit": 30,
+    "background_color": (255, 255, 255),
+    "flag": "images/france.png",
+    "animals": {
+        "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
+        "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
+        "images/cockerel.png": {"effect": "points", "value": 5, "legend": "Cockerel +5"},
+        "images/swan.png": {"effect": "points", "value": 10, "legend": "Swan +10",
+                            "speed": 10, "recycle_x": 3200},
+        "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+        "images/bus.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "y_range": (310, 500)},
+        "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
+    },
+    "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/cockerel.png",
+                      "images/jet.png", "images/bus.png"],
+    "rare_animal_images": ["images/shield.png", "images/swan.png"],
+    "legend_layout": [
+        ("images/swan.png", (30, 30), (100, 40)),
+        ("images/cockerel.png", (30, 130), (100, 140)),
+        ("images/squirrel.png", (30, 230), (100, 240)),
+        ("images/hedgehog.png", (30, 330), (100, 340)),
+        ("images/jet.png", (910, 30), (790, 40)),
+        ("images/bus.png", (910, 130), (790, 140)),
+        ("images/shield.png", (340, 400), (420, 410)),
+    ],
+}
+
+# Adventure's world tour, one country per level. Spain, Germany and
 # friends append here; continent chapters will group lists like this one.
-ADVENTURE_LEVELS = [UK_LEVEL]
+ADVENTURE_LEVELS = [UK_LEVEL, FRANCE_LEVEL]
 
 # A mode is one rules configuration for a round: how many players, which
 # levels, and whether the round's time counts for the high scores. The mode
@@ -206,6 +261,8 @@ MODES = [
      "ends_on_goal": True,
      # No lives in a race - deadly animals only exist in Adventure levels
      "lives": None,
+     # One level and no campaign, so nothing to remember between sessions
+     "progress_file": None,
      "levels": [CLASSIC_LEVEL]},
     {"name": "Adventure",
      "tagline": "One player - eat your way around the world",
@@ -218,6 +275,8 @@ MODES = [
      # against the clock/lives, chasing as high a total as possible
      "ends_on_goal": False,
      "lives": 3,
+     # Star ratings per level (0-3); a starred level unlocks the next one
+     "progress_file": "AdventureProgress.txt",
      "levels": ADVENTURE_LEVELS},
 ]
 mode = MODES[0]
@@ -530,12 +589,75 @@ def runStartScreen():
                 if event.key in (pygame.K_RETURN, pygame.K_SPACE):
                     sounds.play("menu_select")
                     mode = MODES[selected]
-                    # A freshly chosen mode always starts its campaign at
-                    # the first level, even if a previous Adventure run had
-                    # advanced further
+                    # Default to the campaign's first level, even if a
+                    # previous run had advanced further
                     level_index = 0
+                    # Multi-level modes pick a level first; newRound() runs
+                    # once that choice is made
+                    if len(mode["levels"]) > 1:
+                        return "levels"
                     newRound()
                     return "instructions"
+
+
+# Level select for multi-level (campaign) modes: one row per level with its
+# flag and earned stars; a level is unlocked once the one before it has at
+# least one star, so the list is playable strictly in order. Locked rows are
+# dimmed and refuse to confirm.
+def runLevelSelect():
+    global level_index
+
+    progress = loadProgress(mode)
+    unlocked = [i == 0 or progress[i - 1] > 0 for i in range(len(mode["levels"]))]
+    selected = level_index if unlocked[min(level_index, len(unlocked) - 1)] else 0
+    star_img = pygame.transform.smoothscale(loadImage("images/001-star.png"), (28, 28))
+    while True:
+        pygame.display.flip()
+        screen.fill((0, 0, 0))
+        heading = title_font.render("Choose a level", True, (199, 199, 199))
+        screen.blit(heading, (500 - heading.get_width() // 2, 60))
+        for i, lvl in enumerate(mode["levels"]):
+            row_y = 250 + i * 90
+            if not unlocked[i]:
+                color = (70, 70, 70)
+            elif i == selected:
+                color = (224, 185, 9)
+            else:
+                color = (120, 120, 120)
+            if lvl.get("flag"):
+                flag = loadImage(lvl["flag"])
+                if not unlocked[i]:
+                    flag = flag.copy()
+                    flag.set_alpha(60)
+                screen.blit(flag, (290, row_y + 8))
+            name = lvl["name"] + ("" if unlocked[i] else "  -  LOCKED")
+            name_surf = space_font.render(("> " if i == selected else "   ") + name, True, color)
+            screen.blit(name_surf, (330, row_y))
+            # Earned stars follow the name, however long it is
+            for s in range(progress[i]):
+                screen.blit(star_img, (330 + name_surf.get_width() + 24 + s * 34, row_y + 8))
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return "quit"
+            if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_UP, pygame.K_w):
+                    selected = (selected - 1) % len(mode["levels"])
+                    sounds.play("menu_move")
+                if event.key in (pygame.K_DOWN, pygame.K_s):
+                    selected = (selected + 1) % len(mode["levels"])
+                    sounds.play("menu_move")
+                if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    # A locked level refuses with the hurt buzz instead of
+                    # the confirm click
+                    if unlocked[selected]:
+                        sounds.play("menu_select")
+                        level_index = selected
+                        newRound()
+                        return "instructions"
+                    sounds.play("hurt")
+                if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                    sounds.play("menu_move")
+                    return "start"
 
 
 def runInstructions():
@@ -601,11 +723,11 @@ def runInstructions():
                 if event.key == pygame.K_SPACE:
                     sounds.play("menu_select")
                     return "game"
-                # Back to the start screen, e.g. after picking a mode by
-                # accident
+                # Step back one screen, e.g. after picking by accident -
+                # to level select for campaign modes, else the start screen
                 if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                     sounds.play("menu_move")
-                    return "start"
+                    return "levels" if len(mode["levels"]) > 1 else "start"
 
 
 def runGame():
@@ -723,6 +845,34 @@ def runGame():
 def runEndScreen():
     global scores, trophy, level_index
 
+    # The round is over, so its outcome is fixed - compute it once, not per
+    # frame. Reaching the level's point goal is "success" everywhere: Speed
+    # Run's race can only end this way, so this is always true there;
+    # Adventure's round can end via lives or the clock without ever
+    # crossing the goal, so this is the real win/lose split
+    reached_goal = any(p.score >= level["point_goal"] for p in players)
+    next_index = level_index + 1
+    has_next = next_index < len(mode["levels"])
+
+    # Star rating, all derived from the level's own goal so new levels
+    # inherit the rule: 1 star for reaching it, 2 for doubling it, 3 for
+    # doubling it without losing a life
+    stars = 0
+    if mode["player_count"] == 1 and reached_goal:
+        stars = 1
+        if players[0].score >= 2 * level["point_goal"]:
+            stars = 2
+            if players[0].lives == mode["lives"]:
+                stars = 3
+
+    # A better rating than the stored one is remembered forever - one star
+    # is what unlocks the next level on the level select screen
+    if mode.get("progress_file") and stars > 0:
+        progress = loadProgress(mode)
+        if stars > progress[level_index]:
+            progress[level_index] = stars
+            saveProgress(mode, progress)
+
     played_jingle = False
     while True:
         pygame.display.flip()
@@ -750,14 +900,6 @@ def runEndScreen():
                 scores = sorted(scores[:4] + [result_value])
             saveScores(mode["highscore_file"], scores)
 
-        # Reaching the level's point goal is "success" everywhere: Speed
-        # Run's race can only end this way, so this is always true there;
-        # Adventure's round can end via lives or the clock without ever
-        # crossing the goal, so this is the real win/lose split
-        reached_goal = any(p.score >= level["point_goal"] for p in players)
-        next_index = level_index + 1
-        has_next = next_index < len(mode["levels"])
-
         if mode["player_count"] == 1:
             # Every row is centred and stacked from a running cursor, using
             # each surface's real rendered height rather than a guessed
@@ -783,6 +925,16 @@ def runEndScreen():
             score_surf = score_font.render(str(players[0].score), True, players[0].score_color)
             screen.blit(score_surf, (500 - score_surf.get_width() // 2, cursor))
             cursor += score_surf.get_height() + 10
+            # The star rating: earned stars bright, the rest ghosted, so
+            # the player can see what was left on the table
+            if stars > 0:
+                star_full = pygame.transform.smoothscale(loadImage("images/001-star.png"), (44, 44))
+                star_dim = star_full.copy()
+                star_dim.set_alpha(50)
+                row_x = 500 - (3 * 44 + 2 * 14) // 2
+                for s in range(3):
+                    screen.blit(star_full if s < stars else star_dim, (row_x + s * 58, cursor))
+                cursor += 44 + 12
             # The next-country line is always shown - what changes is
             # whether it names an unlocked destination or one still to earn
             if has_next:
@@ -896,6 +1048,8 @@ screen_name = "start"
 while screen_name != "quit":
     if screen_name == "start":
         screen_name = runStartScreen()
+    elif screen_name == "levels":
+        screen_name = runLevelSelect()
     elif screen_name == "instructions":
         screen_name = runInstructions()
     elif screen_name == "game":

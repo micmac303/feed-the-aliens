@@ -130,9 +130,10 @@ dmypy.json
 
 # ide
 .idea
-# Local high score data, not source
+# Local high score and campaign progress data, not source
 Highscore.txt
 AdventureHighscore.txt
+AdventureProgress.txt
 
 # macOS
 .DS_Store
