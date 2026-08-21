@@ -128,13 +128,13 @@ CLASSIC_LEVEL = {
         "images/002-truck.png": {"effect": "obstacle", "value": -5, "legend": "-5"},
         "images/001-bomb.png": {"effect": "obstacle", "value": -2, "legend": "-2"},
         "images/003-tiger.png": {"effect": "opponent", "value": -3, "legend": "-3 to opponent"},
-        "images/001-star.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
+        "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
         "images/001-gift.png": {"effect": "random", "value": 10, "legend": "Random +10 / -10"},
     },
     "animal_images": ["images/003-cow.png", "images/001-hen.png", "images/003-elephant.png",
                       "images/002-rabbit.png", "images/001-bomb.png", "images/002-truck.png",
                       "images/003-tiger.png"],
-    "rare_animal_images": ["images/001-star.png", "images/001-eagle.png", "images/001-gift.png"],
+    "rare_animal_images": ["images/shield.png", "images/001-eagle.png", "images/001-gift.png"],
     "legend_layout": [
         ("images/001-eagle.png", (30, 30), (100, 40)),
         ("images/003-elephant.png", (30, 130), (100, 140)),
@@ -145,7 +145,7 @@ CLASSIC_LEVEL = {
         ("images/001-bomb.png", (910, 130), (860, 140)),
         ("images/001-gift.png", (340, 330), (420, 345)),
         ("images/003-tiger.png", (340, 400), (420, 410)),
-        ("images/001-star.png", (340, 470), (420, 480)),
+        ("images/shield.png", (340, 470), (420, 480)),
     ],
 }
 
@@ -166,11 +166,11 @@ UK_LEVEL = {
                            "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
         "images/bus.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "y_range": (310, 500)},
-        "images/001-star.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
+        "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/fox.png",
                       "images/jet.png", "images/bus.png"],
-    "rare_animal_images": ["images/001-star.png", "images/swan.png"],
+    "rare_animal_images": ["images/shield.png", "images/swan.png"],
     "legend_layout": [
         ("images/swan.png", (30, 30), (100, 40)),
         ("images/fox.png", (30, 130), (100, 140)),
@@ -178,7 +178,7 @@ UK_LEVEL = {
         ("images/hedgehog.png", (30, 330), (100, 340)),
         ("images/jet.png", (910, 30), (790, 40)),
         ("images/bus.png", (910, 130), (790, 140)),
-        ("images/001-star.png", (340, 400), (420, 410)),
+        ("images/shield.png", (340, 400), (420, 410)),
     ],
 }
 
