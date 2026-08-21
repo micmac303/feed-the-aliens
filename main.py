@@ -187,7 +187,10 @@ UK_LEVEL = {
     "point_goal": 100,
     "time_limit": 30,
     # 2-star threshold; defaults to double point_goal when unset
-    "two_star_score": 175,
+    "two_star_score": 150,
+    # 3-star threshold (also requires no lives lost); defaults to
+    # two_star_score when unset
+    "three_star_score": 175,
     # A fixed background instead of newRound()'s random pick
     "background_color": (255, 255, 255),
     # Optional - the in-game score and timer text colour; default is the
@@ -234,7 +237,8 @@ FRANCE_LEVEL = {
     "name": "Level 2 - France",
     "point_goal": 100,
     "time_limit": 30,
-    "two_star_score": 175,
+    "two_star_score": 150,
+    "three_star_score": 175,
     # Navy, like the France football kit, rather than the UK's white
     "background_color": (16, 34, 77),
     "score_color": (239, 65, 53),
@@ -967,15 +971,18 @@ def runEndScreen():
     has_next = next_index < len(mode["levels"])
 
     # Star rating: 1 for reaching the goal, 2 for reaching two_star_score,
-    # 3 for reaching it without losing a life. two_star_score defaults to
-    # double the goal so a level that doesn't set it still gets a sensible
-    # threshold; UK and France both set it explicitly to 150
+    # 3 for reaching three_star_score without losing a life. two_star_score
+    # defaults to double the goal so a level that doesn't set it still gets
+    # a sensible threshold; three_star_score defaults to two_star_score.
+    # UK and France set them explicitly to 150 and 175
     stars = 0
     if mode["player_count"] == 1 and reached_goal:
         stars = 1
-        if players[0].score >= level.get("two_star_score", 2 * level["point_goal"]):
+        two_star_score = level.get("two_star_score", 2 * level["point_goal"])
+        three_star_score = level.get("three_star_score", two_star_score)
+        if players[0].score >= two_star_score:
             stars = 2
-            if players[0].lives == mode["lives"]:
+            if players[0].score >= three_star_score and players[0].lives == mode["lives"]:
                 stars = 3
 
     # A better rating than the stored one is remembered forever - one star
