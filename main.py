@@ -41,7 +41,9 @@ colours = [(49, 201, 235), (34, 52, 153), (50, 92, 166), (89, 125, 189), (89, 14
            ]
 
 # Highscores are player data, not source, so the files below are not in git.
-# Each mode owns its own file and its own starting defaults - Speed Run
+# Each *level* owns its own file and its own starting defaults, not the mode -
+# Adventure's countries each chase their own table rather than one shared
+# across the whole campaign. The mode only decides the metric: Speed Run
 # tracks times (lower is better), Adventure tracks points (higher is better)
 
 
@@ -62,6 +64,25 @@ def loadScores(path, defaults):
     except (OSError, ValueError):
         saveScores(path, defaults)
         return list(defaults)
+
+
+# scores is stored ascending either way; points ranks best-first by reading
+# it back to front (highest is best), time by reading it as stored (lowest
+# is best). Shared by the instructions and end screens so the two can't
+# drift out of step on how a rank is read.
+def rankedScores():
+    return list(reversed(scores)) if mode["score_type"] == "points" else scores
+
+
+def formatScoreValue(value):
+    return str(int(value)) if mode["score_type"] == "points" else str(value)
+
+
+# One compact "1: X   2: Y ..." line - used by the solo end screen, which
+# has no room to spare for a five-row list alongside everything else on it.
+def compactScoresLine(ranked):
+    return "High Scores:  " + "   ".join(
+        str(i + 1) + ": " + formatScoreValue(v) for i, v in enumerate(ranked))
 
 
 # Campaign progress is player data too (gitignored like the highscores):
@@ -150,6 +171,8 @@ sound_events = []
 CLASSIC_LEVEL = {
     "name": None,  # Speed Run shows no level name
     "point_goal": 100,
+    "highscore_file": "Highscore.txt",
+    "default_scores": [30.0, 40.0, 50.0, 60.0, 70.0],
     "animals": {
         "images/003-cow.png": {"effect": "points", "value": 3, "legend": "+3"},
         "images/001-hen.png": {"effect": "points", "value": 1, "legend": "+1"},
@@ -185,6 +208,8 @@ CLASSIC_LEVEL = {
 UK_LEVEL = {
     "name": "Level 1 - United Kingdom",
     "point_goal": 100,
+    "highscore_file": "UKHighscore.txt",
+    "default_scores": [10.0, 20.0, 30.0, 40.0, 50.0],
     "time_limit": 30,
     # 2-star threshold; defaults to double point_goal when unset
     "two_star_score": 150,
@@ -236,6 +261,8 @@ UK_LEVEL = {
 FRANCE_LEVEL = {
     "name": "Level 2 - France",
     "point_goal": 100,
+    "highscore_file": "FranceHighscore.txt",
+    "default_scores": [10.0, 20.0, 30.0, 40.0, 50.0],
     "time_limit": 30,
     "two_star_score": 150,
     "three_star_score": 175,
@@ -278,6 +305,8 @@ FRANCE_LEVEL = {
 ITALY_LEVEL = {
     "name": "Level 3 - Italy",
     "point_goal": 100,
+    "highscore_file": "ItalyHighscore.txt",
+    "default_scores": [10.0, 20.0, 30.0, 40.0, 50.0],
     "time_limit": 30,
     "two_star_score": 150,
     "three_star_score": 175,
@@ -319,6 +348,8 @@ ITALY_LEVEL = {
 SPAIN_LEVEL = {
     "name": "Level 4 - Spain",
     "point_goal": 100,
+    "highscore_file": "SpainHighscore.txt",
+    "default_scores": [10.0, 20.0, 30.0, 40.0, 50.0],
     "time_limit": 30,
     "two_star_score": 150,
     "three_star_score": 175,
@@ -364,13 +395,11 @@ ADVENTURE_LEVELS = [UK_LEVEL, FRANCE_LEVEL, ITALY_LEVEL, SPAIN_LEVEL]
 # reads it, nothing resets it). A rule that varies by mode belongs in this
 # table, not in an if somewhere - a new mode is a new entry.
 MODES = [
-    {"name": "Speed Run",
+    {"name": "Local Multiplayer",
      "tagline": "The first to 100 points wins",
      "player_count": 2,
      "saves_highscore": True,
      "score_type": "time",  # lower is better
-     "highscore_file": "Highscore.txt",
-     "default_scores": [30.0, 40.0, 50.0, 60.0, 70.0],
      # Reaching the goal ends the race immediately - that is the whole game
      "ends_on_goal": True,
      # No lives in a race - deadly animals only exist in Adventure levels
@@ -383,8 +412,6 @@ MODES = [
      "player_count": 1,
      "saves_highscore": True,
      "score_type": "points",  # higher is better
-     "highscore_file": "AdventureHighscore.txt",
-     "default_scores": [10.0, 20.0, 30.0, 40.0, 50.0],
      # The point goal does not end the round - the player keeps scoring
      # against the clock/lives, chasing as high a total as possible
      "ends_on_goal": False,
@@ -703,7 +730,7 @@ def newRound(seed=None):
 
     sound_events.clear()
 
-    scores = loadScores(mode["highscore_file"], mode["default_scores"])
+    scores = loadScores(level["highscore_file"], level["default_scores"])
     trophy = False
 
     current_time = 0
@@ -878,16 +905,16 @@ def runInstructions():
             screen.blit(space_font.render(controls, True, (199, 199, 199)), (220, 280))
         prompt = points_font.render("Enter to start, ESC to go back", True, (199, 199, 199))
         screen.blit(prompt, (500 - prompt.get_width() // 2, 550))
-        # Highscore - shown only in modes that keep a table. Stored ascending
-        # either way; points ranks best-first by reading it back to front
-        # (highest is best), time by reading it as stored (lowest is best)
+        # Highscore - shown only in modes that keep a table. This is the
+        # active level's own table (each Adventure country tracks its own
+        # scores, not one shared across the whole campaign), so it changes
+        # as the player steps through the campaign
         if mode["saves_highscore"]:
-            ranked = list(reversed(scores)) if mode["score_type"] == "points" else scores
+            ranked = rankedScores()
             # Sits high enough that the fifth row clears the bottom prompt
             screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (720, 250))
             for i in range(0, 5):
-                value = int(ranked[i]) if mode["score_type"] == "points" else ranked[i]
-                screen.blit(space_font.render(str(i + 1) + "   " + str(value), True, (224, 185, 9)), (720, 305 + i * 45))
+                screen.blit(space_font.render(str(i + 1) + "   " + formatScoreValue(ranked[i]), True, (224, 185, 9)), (720, 305 + i * 45))
         # Animal pictures, labelled from the level's animals table so the
         # legend cannot drift out of step with what the animals are worth
         for legend_name, image_at, label_at in level["legend_layout"]:
@@ -1082,9 +1109,7 @@ def runEndScreen():
     while True:
         pygame.display.flip()
         screen.fill((0, 0, 0))
-        # Stored ascending either way; points ranks best-first by reading it
-        # back to front (highest is best), time as stored (lowest is best)
-        ranked = list(reversed(scores)) if mode["score_type"] == "points" else scores
+        ranked = rankedScores()
 
         # Highscores, saved once per round rather than on every frame. The
         # metric and the direction that counts as "better" both come from
@@ -1103,7 +1128,7 @@ def runEndScreen():
                 scores = sorted(scores[1:] + [result_value])
             else:
                 scores = sorted(scores[:4] + [result_value])
-            saveScores(mode["highscore_file"], scores)
+            saveScores(level["highscore_file"], scores)
 
         if mode["player_count"] == 1:
             # Every row is centred and stacked from a running cursor, using
@@ -1171,10 +1196,7 @@ def runEndScreen():
                 cursor += icon.get_height() + 12
             # One compact line rather than a label plus a five-row list -
             # there just isn't room for both alongside everything above
-            scores_text = "High Scores:  " + "   ".join(
-                str(i + 1) + ": " + str(int(v) if mode["score_type"] == "points" else v)
-                for i, v in enumerate(ranked))
-            scores_surf = space_font.render(scores_text, True, (224, 185, 9))
+            scores_surf = space_font.render(compactScoresLine(ranked), True, (224, 185, 9))
             screen.blit(scores_surf, (500 - scores_surf.get_width() // 2, cursor))
             cursor += scores_surf.get_height() + 12
             controls = "R: Play Again    "
@@ -1186,8 +1208,7 @@ def runEndScreen():
         else:
             screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (775, 280))
             for i in range(0, 5):
-                value = int(ranked[i]) if mode["score_type"] == "points" else ranked[i]
-                screen.blit(space_font.render(str(i + 1) + "   " + str(value), True, (224, 185, 9)), (775, 340 + i * 50))
+                screen.blit(space_font.render(str(i + 1) + "   " + formatScoreValue(ranked[i]), True, (224, 185, 9)), (775, 340 + i * 50))
             screen.blit(points_font.render("Press R to play again, M for main menu, Q to quit", True, (220, 220, 220)), (10, 550))
             screen.blit(timer_font.render("Time: " + str(round(current_time/1000, 2)), True, (199, 199, 199)), (350, 10))
             screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))

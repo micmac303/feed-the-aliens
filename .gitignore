@@ -130,9 +130,9 @@ dmypy.json
 
 # ide
 .idea
-# Local high score and campaign progress data, not source
-Highscore.txt
-AdventureHighscore.txt
+# Local high score and campaign progress data, not source. Each level owns
+# its own highscore file (Highscore.txt, UKHighscore.txt, FranceHighscore.txt, ...)
+*Highscore.txt
 AdventureProgress.txt
 
 # macOS
