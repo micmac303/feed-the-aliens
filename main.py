@@ -22,6 +22,7 @@ pygame.display.set_caption("Feed The Aliens")
 
 timer_font = pygame.font.SysFont("impact", 60)
 huge_font = pygame.font.SysFont("impact", 352)
+score_font = pygame.font.SysFont("impact", 120)
 points_font = pygame.font.SysFont("impact", 32)
 instruction_font = pygame.font.SysFont("ebrima", 38)
 space_font = pygame.font.SysFont("impact", 40)
@@ -217,6 +218,11 @@ MODES = [
      "levels": ADVENTURE_LEVELS},
 ]
 mode = MODES[0]
+# Which of mode["levels"] is active - the campaign position for level-based
+# modes (Adventure). Reset to 0 whenever a mode is freshly chosen (runModeSelect);
+# left alone on a replay (newRound() with no other change) and advanced by
+# runEndScreen's next-level key, so it survives exactly like mode does.
+level_index = 0
 
 # A spawnable animal with no table entry would silently score nothing
 for m in MODES:
@@ -418,7 +424,7 @@ def updateGame(all_intents, dt):
 # again on restart, so a starting value only ever has to be written here.
 # Anything new that should start fresh each round belongs in this function.
 def newRound(seed=None):
-    global players, rng, level
+    global players, rng, level, level_index
     global scores, trophy, chosen_color
     global current_time, last_time
 
@@ -428,10 +434,12 @@ def newRound(seed=None):
     rng = random.Random(seed)
 
     # The active level supplies the round's content: spawn pools, animal
-    # effects, legend and point goal. Always the mode's first level until
-    # level progression exists - advancing will just be a bigger index. Must
-    # be set before the animals below are spawned
-    level = mode["levels"][0]
+    # effects, legend and point goal. level_index is the campaign position -
+    # 0 for a fresh mode, unchanged on a replay, advanced by the end
+    # screen's next-level key; clamped so a shorter mode's list can't run
+    # off the end. Must be set before the animals below are spawned
+    level_index = min(level_index, len(mode["levels"]) - 1)
+    level = mode["levels"][level_index]
 
     # Fresh Player objects reset score, position and shield; the identity
     # arguments (controls, colours, HUD spots) are what tell the two apart.
@@ -508,7 +516,7 @@ def runStartScreen():
 
 
 def runModeSelect():
-    global mode
+    global mode, level_index
 
     selected = MODES.index(mode)
     while True:
@@ -538,6 +546,10 @@ def runModeSelect():
                 if event.key == pygame.K_RETURN:
                     sounds.play("menu_select")
                     mode = MODES[selected]
+                    # A freshly chosen mode always starts its campaign at
+                    # the first level, even if a previous Adventure run had
+                    # advanced further
+                    level_index = 0
                     newRound()
                     return "instructions"
 
@@ -696,39 +708,16 @@ def runGame():
 
 
 def runEndScreen():
-    global scores, trophy
+    global scores, trophy, level_index
 
     played_jingle = False
     while True:
         pygame.display.flip()
         screen.fill((0, 0, 0))
-        screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (775, 280))
         # Stored ascending either way; points ranks best-first by reading it
         # back to front (highest is best), time as stored (lowest is best)
         ranked = list(reversed(scores)) if mode["score_type"] == "points" else scores
-        for i in range(0, 5):
-            value = int(ranked[i]) if mode["score_type"] == "points" else ranked[i]
-            screen.blit(space_font.render(str(i + 1) + "   " + str(value), True, (224, 185, 9)), (775, 340 + i * 50))
-        screen.blit(points_font.render("Press R to play again, M for main menu, Q to quit", True, (220, 220, 220)), (10, 550))
-        screen.blit(timer_font.render("Time: " + str(round(current_time/1000, 2)), True, (199, 199, 199)), (350, 10))
-        screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
-        for p, corner in zip(players, ((30, 30), (880, 30))):
-            screen.blit(space_font.render("P" + str(p.number) + ": " + str(p.score), True, p.color), corner)
-        # Display winner. Tested against the level's point goal, the same
-        # thing that ended the game, so changing the goal cannot leave the
-        # winner unnamed
-        for p in players:
-            if mode["ends_on_goal"] and p.score >= level["point_goal"]:
-                screen.blit(space_font.render(p.label + " WINS!", True, p.color), (355, 100))
-                screen.blit(p.img, (440, 150))
-            # A round can end in defeat instead: the UFO ran out of lives
-            elif p.lives is not None and p.lives <= 0:
-                screen.blit(space_font.render("OUT OF LIVES!", True, p.color), (355, 100))
-                screen.blit(loadImage("images/explosion.png"), (440, 150))
-            # Or a level's time limit could have run out first
-            elif level.get("time_limit") is not None and current_time / 1000 >= level["time_limit"]:
-                screen.blit(space_font.render("TIME'S UP!", True, p.color), (355, 100))
-                screen.blit(p.img, (440, 150))
+
         # Highscores, saved once per round rather than on every frame. The
         # metric and the direction that counts as "better" both come from
         # the mode: Speed Run's time is better low, Adventure's score is
@@ -747,17 +736,116 @@ def runEndScreen():
             else:
                 scores = sorted(scores[:4] + [result_value])
             saveScores(mode["highscore_file"], scores)
-        if trophy:
-            screen.blit(space_font.render("New High Score!", True, (224, 185, 9)), (355, 380))
-            screen.blit(loadImage("images/001-trophy.png"), (440, 430))
+
+        # Reaching the level's point goal is "success" everywhere: Speed
+        # Run's race can only end this way, so this is always true there;
+        # Adventure's round can end via lives or the clock without ever
+        # crossing the goal, so this is the real win/lose split
+        reached_goal = any(p.score >= level["point_goal"] for p in players)
+        next_index = level_index + 1
+        has_next = next_index < len(mode["levels"])
+
+        if mode["player_count"] == 1:
+            # Every row is centred and stacked from a running cursor, using
+            # each surface's real rendered height rather than a guessed
+            # constant (impact's glyphs run much taller than their point
+            # size suggests) - so an optional row (the failure reason, the
+            # trophy) can't leave the rows below it overlapping
+            cursor = 15
+            banner_color = (224, 185, 9) if reached_goal else (207, 41, 41)
+            banner = title_font.render("SUCCESS!" if reached_goal else "FAILED", True, banner_color)
+            screen.blit(banner, (500 - banner.get_width() // 2, cursor))
+            cursor += banner.get_height() + 8
+            # A failure needs a reason; a success is self-explanatory from
+            # the score alone, so it gets no subtitle
+            if not reached_goal:
+                if players[0].lives is not None and players[0].lives <= 0:
+                    reason = "Out of lives!"
+                else:
+                    reason = "Time's up!"
+                sub = points_font.render(reason, True, (199, 199, 199))
+                screen.blit(sub, (500 - sub.get_width() // 2, cursor))
+                cursor += sub.get_height() + 10
+            # The score is the headline: big, centred, in the player's colour
+            score_surf = score_font.render(str(players[0].score), True, players[0].score_color)
+            screen.blit(score_surf, (500 - score_surf.get_width() // 2, cursor))
+            cursor += score_surf.get_height() + 10
+            # The next-country line is always shown - what changes is
+            # whether it names an unlocked destination or one still to earn
+            if has_next:
+                next_name = mode["levels"][next_index]["name"]
+                if reached_goal:
+                    next_text = "Next: " + next_name
+                    next_color = (224, 185, 9)
+                else:
+                    next_text = "Reach " + str(level["point_goal"]) + " points to unlock " + next_name
+                    next_color = (150, 150, 150)
+            else:
+                next_text = "More countries coming soon!"
+                next_color = (224, 185, 9) if reached_goal else (150, 150, 150)
+            next_surf = space_font.render(next_text, True, next_color)
+            screen.blit(next_surf, (500 - next_surf.get_width() // 2, cursor))
+            cursor += next_surf.get_height() + 15
+            if trophy:
+                # Icon and caption sit side by side as one row, not stacked -
+                # there isn't vertical room to spare for a second trophy row
+                icon = loadImage("images/001-trophy.png")
+                trophy_surf = space_font.render("New High Score!", True, (224, 185, 9))
+                row_width = icon.get_width() + 10 + trophy_surf.get_width()
+                row_x = 500 - row_width // 2
+                screen.blit(icon, (row_x, cursor))
+                screen.blit(trophy_surf, (row_x + icon.get_width() + 10, cursor + (icon.get_height() - trophy_surf.get_height()) // 2))
+                cursor += icon.get_height() + 12
+            # One compact line rather than a label plus a five-row list -
+            # there just isn't room for both alongside everything above
+            scores_text = "High Scores:  " + "   ".join(
+                str(i + 1) + ": " + str(int(v) if mode["score_type"] == "points" else v)
+                for i, v in enumerate(ranked))
+            scores_surf = space_font.render(scores_text, True, (224, 185, 9))
+            screen.blit(scores_surf, (500 - scores_surf.get_width() // 2, cursor))
+            cursor += scores_surf.get_height() + 12
+            controls = "R: Play Again    "
+            if reached_goal and has_next:
+                controls += "N: Next Level    "
+            controls += "M: Menu    Q: Quit"
+            controls_surf = points_font.render(controls, True, (220, 220, 220))
+            screen.blit(controls_surf, (500 - controls_surf.get_width() // 2, cursor))
+        else:
+            screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (775, 280))
+            for i in range(0, 5):
+                value = int(ranked[i]) if mode["score_type"] == "points" else ranked[i]
+                screen.blit(space_font.render(str(i + 1) + "   " + str(value), True, (224, 185, 9)), (775, 340 + i * 50))
+            screen.blit(points_font.render("Press R to play again, M for main menu, Q to quit", True, (220, 220, 220)), (10, 550))
+            screen.blit(timer_font.render("Time: " + str(round(current_time/1000, 2)), True, (199, 199, 199)), (350, 10))
+            screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
+            for p, corner in zip(players, ((30, 30), (880, 30))):
+                screen.blit(space_font.render("P" + str(p.number) + ": " + str(p.score), True, p.color), corner)
+            # Display winner. Tested against the level's point goal, the same
+            # thing that ended the game, so changing the goal cannot leave
+            # the winner unnamed
+            for p in players:
+                if mode["ends_on_goal"] and p.score >= level["point_goal"]:
+                    screen.blit(space_font.render(p.label + " WINS!", True, p.color), (355, 100))
+                    screen.blit(p.img, (440, 150))
+                # A round can end in defeat instead: the UFO ran out of lives
+                elif p.lives is not None and p.lives <= 0:
+                    screen.blit(space_font.render("OUT OF LIVES!", True, p.color), (355, 100))
+                    screen.blit(loadImage("images/explosion.png"), (440, 150))
+                # Or a level's time limit could have run out first
+                elif level.get("time_limit") is not None and current_time / 1000 >= level["time_limit"]:
+                    screen.blit(space_font.render("TIME'S UP!", True, p.color), (355, 100))
+                    screen.blit(p.img, (440, 150))
+            if trophy:
+                screen.blit(space_font.render("New High Score!", True, (224, 185, 9)), (355, 380))
+                screen.blit(loadImage("images/001-trophy.png"), (440, 430))
         # One jingle as the screen appears, chosen after the trophy check
         # just above so a record run gets the fanfare instead of the plain
-        # win jingle; running out of lives gets the sad one
+        # win jingle; not reaching the goal gets the sad one
         if not played_jingle:
             played_jingle = True
             if trophy:
                 sounds.play("trophy")
-            elif any(p.lives is not None and p.lives <= 0 for p in players):
+            elif not reached_goal:
                 sounds.play("jingle_lose")
             else:
                 sounds.play("jingle_win")
@@ -766,9 +854,17 @@ def runEndScreen():
                 return "quit"
             if event.type == pygame.KEYDOWN:
                 # R jumps straight back to the level's instructions screen -
-                # same mode, fresh round - skipping the title and mode select
+                # same mode, same level, fresh round - skipping the title
+                # and mode select
                 if event.key == pygame.K_r:
                     sounds.play("menu_select")
+                    newRound()
+                    return "instructions"
+                # N advances the campaign - only live when the goal was
+                # actually reached and there is somewhere further to go
+                if event.key == pygame.K_n and reached_goal and has_next:
+                    sounds.play("menu_select")
+                    level_index = next_index
                     newRound()
                     return "instructions"
                 # M leaves the round behind for the title screen; the mode
