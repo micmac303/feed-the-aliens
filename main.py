@@ -187,7 +187,7 @@ UK_LEVEL = {
     "point_goal": 100,
     "time_limit": 30,
     # 2-star threshold; defaults to double point_goal when unset
-    "two_star_score": 150,
+    "two_star_score": 175,
     # A fixed background instead of newRound()'s random pick
     "background_color": (255, 255, 255),
     # Optional - the in-game score and timer text colour; default is the
@@ -234,7 +234,7 @@ FRANCE_LEVEL = {
     "name": "Level 2 - France",
     "point_goal": 100,
     "time_limit": 30,
-    "two_star_score": 150,
+    "two_star_score": 175,
     # Navy, like the France football kit, rather than the UK's white
     "background_color": (16, 34, 77),
     "score_color": (239, 65, 53),
