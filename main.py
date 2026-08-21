@@ -491,21 +491,33 @@ def runInstructions():
         screen.fill((0, 0, 0))
         heading = title_font.render(mode["name"], True, (199, 199, 199))
         screen.blit(heading, (500 - heading.get_width() // 2, 15))
-        screen.blit(instruction_font.render("Collect the animals to score points", True, (97, 8, 207)), (220, 130))
-        screen.blit(instruction_font.render("Avoid the hazards", True, (97, 8, 207)), (220, 180))
-        # Third line: the level name when the level has one (Adventure's
-        # countries), otherwise the mode tagline
-        third_line = level["name"] or mode["tagline"]
-        screen.blit(instruction_font.render(third_line, True, (224, 185, 9) if level["name"] else (97, 8, 207)), (220, 230))
-        # Controls, one entry per seat, so this screen matches the mode
-        controls = "   ".join("P" + str(p.number) + ": " + p.controls_text for p in players)
-        screen.blit(space_font.render(controls, True, (199, 199, 199)), (220, 280))
-        screen.blit(space_font.render("Press SPACE to start, ESC to change mode", True, (199, 199, 199)), (150, 550))
+        if mode["player_count"] == 1:
+            # Solo layout: level name, the player's UFO and how to move, all
+            # centred down the middle; the legend keeps the side columns
+            name = instruction_font.render(level["name"] or mode["tagline"],
+                                           True, (224, 185, 9) if level["name"] else (97, 8, 207))
+            screen.blit(name, (500 - name.get_width() // 2, 130))
+            screen.blit(pygame.transform.smoothscale(players[0].img, (128, 128)), (436, 195))
+            move = space_font.render(players[0].controls_text + " to move", True, (199, 199, 199))
+            screen.blit(move, (500 - move.get_width() // 2, 340))
+        else:
+            screen.blit(instruction_font.render("Collect the animals to score points", True, (97, 8, 207)), (220, 130))
+            screen.blit(instruction_font.render("Avoid the hazards", True, (97, 8, 207)), (220, 180))
+            # Third line: the level name when the level has one (Adventure's
+            # countries), otherwise the mode tagline
+            third_line = level["name"] or mode["tagline"]
+            screen.blit(instruction_font.render(third_line, True, (224, 185, 9) if level["name"] else (97, 8, 207)), (220, 230))
+            # Controls, one entry per seat, so this screen matches the mode
+            controls = "   ".join("P" + str(p.number) + ": " + p.controls_text for p in players)
+            screen.blit(space_font.render(controls, True, (199, 199, 199)), (220, 280))
+        prompt = space_font.render("Press SPACE to start, ESC to change mode", True, (199, 199, 199))
+        screen.blit(prompt, (500 - prompt.get_width() // 2, 550))
         # Highscore - shown only in modes whose times go in the table
         if mode["saves_highscore"]:
-            screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (720, 280))
+            # Sits high enough that the fifth row clears the bottom prompt
+            screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (720, 250))
             for i in range(0, 5):
-                screen.blit(space_font.render(str(i + 1) + "   " + str(scores[i]), True, (224, 185, 9)), (720, 340 + i * 50))
+                screen.blit(space_font.render(str(i + 1) + "   " + str(scores[i]), True, (224, 185, 9)), (720, 305 + i * 45))
         # Animal pictures, labelled from the level's animals table so the
         # legend cannot drift out of step with what the animals are worth
         for legend_name, image_at, label_at in level["legend_layout"]:
