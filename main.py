@@ -250,12 +250,12 @@ FRANCE_LEVEL = {
                             "speed": 10, "recycle_x": 3200},
         "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
-        "images/bus.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+        "images/paris-tram.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/cockerel.png",
-                      "images/jet.png", "images/bus.png"],
+                      "images/jet.png", "images/paris-tram.png"],
     "rare_animal_images": ["images/shield.png", "images/swan.png"],
     "legend_layout": [
         ("images/swan.png", (30, 30), (100, 40)),
@@ -263,7 +263,7 @@ FRANCE_LEVEL = {
         ("images/squirrel.png", (30, 230), (100, 240)),
         ("images/hedgehog.png", (30, 330), (100, 340)),
         ("images/jet.png", (910, 30), (790, 40)),
-        ("images/bus.png", (910, 130), (790, 140)),
+        ("images/paris-tram.png", (910, 130), (790, 140)),
         ("images/shield.png", (340, 400), (420, 410)),
     ],
 }
