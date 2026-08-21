@@ -273,9 +273,7 @@ FRANCE_LEVEL = {
 }
 
 # Level 3. The same cast again, with the stallion standing in for the
-# swan/cockerel and the fox back in its UK slot. No landmark yet - there's
-# no Italian landmark art, so the clock just ends the round like it used to
-# before landmarks existed.
+# swan/cockerel and the fox back in its UK slot.
 ITALY_LEVEL = {
     "name": "Level 3 - Italy",
     "point_goal": 100,
@@ -286,6 +284,8 @@ ITALY_LEVEL = {
     "score_color": (255, 255, 255),
     "timer_color": (206, 43, 55),
     "flag": "images/italy.png",
+    "landmark": "images/colosseum.png",
+    "landmark_name": "the Colosseum",
     "animals": {
         "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
         "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
@@ -294,12 +294,12 @@ ITALY_LEVEL = {
                             "speed": 10, "recycle_x": 3200},
         "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
-        "images/rome-bus.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+        "images/vespa.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/fox.png",
-                      "images/jet.png", "images/rome-bus.png"],
+                      "images/jet.png", "images/vespa.png"],
     "rare_animal_images": ["images/shield.png", "images/stallion.png"],
     "legend_layout": [
         ("images/stallion.png", (30, 30), (100, 40)),
@@ -307,7 +307,7 @@ ITALY_LEVEL = {
         ("images/squirrel.png", (30, 230), (100, 240)),
         ("images/hedgehog.png", (30, 330), (100, 340)),
         ("images/jet.png", (910, 30), (790, 40)),
-        ("images/rome-bus.png", (910, 130), (790, 140)),
+        ("images/vespa.png", (910, 130), (790, 140)),
         ("images/shield.png", (340, 400), (420, 410)),
     ],
 }
