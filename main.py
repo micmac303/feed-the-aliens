@@ -102,8 +102,8 @@ player2_img = loadImage("images/021-ufo.png")
 animals = []
 
 # A level's finish line: None until level["time_limit"] elapses, then a
-# full-size Landmark, a genuine obstacle rather than a target - a UFO must
-# fly over its roofline to finish; touching the building itself crashes.
+# Landmark, a genuine obstacle rather than a target - a UFO must fly over
+# its roofline to finish; touching the building itself crashes.
 # landmark_cleared/landmark_crashed flip on those two outcomes - runGame()
 # reads them the same way it reads lives/score, rather than updateGame()
 # deciding a screen transition itself.
@@ -363,13 +363,15 @@ class Animal:
 
 
 # A level's finish line: fixed position, no movement, no recycling - the
-# opposite of Animal. Full size, snug against the bottom-left corner. Its
-# own rect is the building - a solid obstacle, not a target - and rect
-# covers only the strip of open sky directly above the roofline. Entering
-# sky_rect clears it (flies over); entering rect crashes into it.
+# opposite of Animal. Half native size, snug against the bottom-left
+# corner. Its own rect is the building - a solid obstacle, not a target -
+# and sky_rect covers only the strip of open sky directly above the
+# roofline. Entering sky_rect clears it (flies over); entering rect
+# crashes into it.
 class Landmark:
     def __init__(self, image_path):
-        self.img = loadImage(image_path)
+        full = loadImage(image_path)
+        self.img = pygame.transform.smoothscale(full, (full.get_width() // 2, full.get_height() // 2))
         self.x = 0
         self.y = 600 - self.img.get_height()
         self.rect = pygame.Rect(self.x, self.y, self.img.get_width(), self.img.get_height())
