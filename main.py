@@ -855,8 +855,11 @@ def runInstructions():
                 # Sits in the one gap free of both the legend (which claims
                 # the shield's spot right below "to move") and the
                 # highscore table on the right - short wording is load
-                # bearing, there isn't width to spare between them
-                finish = points_font.render("Fly over " + level["landmark_name"] + " to finish!",
+                # bearing, there isn't width to spare between them (this is
+                # why it matches the HUD's shorter "Fly over X!" rather than
+                # spelling out "...to finish!" - the Sagrada Familia's name
+                # alone is long enough to reach the highscore column)
+                finish = points_font.render("Fly over " + level["landmark_name"] + "!",
                                             True, (199, 199, 199))
                 screen.blit(finish, (500 - finish.get_width() // 2, 470))
         else:
