@@ -102,12 +102,14 @@ player2_img = loadImage("images/021-ufo.png")
 animals = []
 
 # A level's finish line: None until level["time_limit"] elapses, then a
-# fixed Landmark a UFO must reach to end the round (see the "landmark" key
-# on level dicts). landmark_reached flips once any player's hitbox touches
-# it - runGame() reads that the same way it reads lives/score, rather than
-# updateGame() deciding a screen transition itself.
+# full-size Landmark, a genuine obstacle rather than a target - a UFO must
+# fly over its roofline to finish; touching the building itself crashes.
+# landmark_cleared/landmark_crashed flip on those two outcomes - runGame()
+# reads them the same way it reads lives/score, rather than updateGame()
+# deciding a screen transition itself.
 landmark = None
-landmark_reached = False
+landmark_cleared = False
+landmark_crashed = False
 
 # Sound events the sim emits, one name per thing that happened ("collect",
 # "explosion", ...). The sim only ever appends names here - it never touches
@@ -361,15 +363,17 @@ class Animal:
 
 
 # A level's finish line: fixed position, no movement, no recycling - the
-# opposite of Animal. Its rect is the full sprite (not a shrunk hitbox like
-# Player/Animal use), deliberately generous since it is the target to hit,
-# not an obstacle to dodge.
+# opposite of Animal. Full size, snug against the bottom-left corner. Its
+# own rect is the building - a solid obstacle, not a target - and rect
+# covers only the strip of open sky directly above the roofline. Entering
+# sky_rect clears it (flies over); entering rect crashes into it.
 class Landmark:
     def __init__(self, image_path):
-        self.img = pygame.transform.smoothscale(loadImage(image_path), (140, 140))
-        self.x = 820
-        self.y = 230
-        self.rect = pygame.Rect(self.x, self.y, 140, 140)
+        self.img = loadImage(image_path)
+        self.x = 0
+        self.y = 600 - self.img.get_height()
+        self.rect = pygame.Rect(self.x, self.y, self.img.get_width(), self.img.get_height())
+        self.sky_rect = pygame.Rect(self.x, 0, self.img.get_width(), self.y)
 
     def draw(self, screen):
         screen.blit(self.img, (self.x, self.y))
@@ -510,14 +514,18 @@ def keyboardIntents(pressed, controls):
 # collisions and scoring. No drawing and no input reads - this is the function
 # a headless server would run. all_intents lines up with players by index
 def updateGame(all_intents, dt):
-    global landmark, landmark_reached
+    global landmark, landmark_cleared, landmark_crashed
 
     for p, intents in zip(players, all_intents):
         p.update(intents, dt)
     for animal in animals:
         animal.update(dt)
         if animal.x > animal.recycle_x:
-            animals.append(Animal())
+            # Once the landmark has appeared, nothing new spawns - existing
+            # animals just thin out as they recycle off, rather than being
+            # replaced
+            if landmark is None:
+                animals.append(Animal())
             animals.remove(animal)
         for p in players:
             if p.rect.colliderect(animal.rect):
@@ -526,14 +534,21 @@ def updateGame(all_intents, dt):
 
     # A level with a landmark doesn't end on the clock - time_limit instead
     # marks when the finish line appears, and the round ends once a UFO
-    # actually reaches it
+    # either clears it or crashes into it
     if landmark is None and level.get("landmark") and level.get("time_limit") is not None \
             and current_time / 1000 >= level["time_limit"]:
         landmark = Landmark(level["landmark"])
-    if landmark is not None and not landmark_reached:
+    if landmark is not None:
         for p in players:
-            if p.rect.colliderect(landmark.rect):
-                landmark_reached = True
+            if not landmark_cleared and p.rect.colliderect(landmark.sky_rect):
+                landmark_cleared = True
+            if not landmark_crashed and p.rect.colliderect(landmark.rect):
+                landmark_crashed = True
+                # A crash is a hard fail, not just a hit - all lives gone,
+                # same explosion as any other deadly collision
+                p.lives = 0
+                p.explosion_timer = 50
+                sound_events.append("explosion")
 
 
 # Reset everything that belongs to a single round. Called once at startup and
@@ -543,7 +558,7 @@ def newRound(seed=None):
     global players, rng, level, level_index
     global scores, trophy, chosen_color
     global current_time, last_time
-    global landmark, landmark_reached
+    global landmark, landmark_cleared, landmark_crashed
 
     # Every roll the sim makes (spawns, gift coin flips, background colour)
     # comes from this generator. Pass a seed to replay a round exactly - the
@@ -591,7 +606,8 @@ def newRound(seed=None):
         animals.append(Animal(slot=i))
 
     landmark = None
-    landmark_reached = False
+    landmark_cleared = False
+    landmark_crashed = False
 
     sound_events.clear()
 
@@ -748,7 +764,7 @@ def runInstructions():
                 # the shield's spot right below "to move") and the
                 # highscore table on the right - short wording is load
                 # bearing, there isn't width to spare between them
-                finish = points_font.render("Reach " + level["landmark_name"] + " to finish!",
+                finish = points_font.render("Fly over " + level["landmark_name"] + " to finish!",
                                             True, (199, 199, 199))
                 screen.blit(finish, (500 - finish.get_width() // 2, 470))
         else:
@@ -811,7 +827,9 @@ def runGame():
             sounds.stop_hum()
             return "end"
         # Out of lives ends the round too - but only after the explosion has
-        # played out, so the player sees the blast before the end screen
+        # played out, so the player sees the blast before the end screen.
+        # A landmark crash sets lives to 0 and plays the same explosion, so
+        # it ends the round through this same check - no separate case needed
         if any(p.lives is not None and p.lives <= 0 and p.explosion_timer <= 0 for p in players):
             sounds.stop_hum()
             return "end"
@@ -822,7 +840,7 @@ def runGame():
                 and current_time / 1000 >= level["time_limit"]:
             sounds.stop_hum()
             return "end"
-        if landmark_reached:
+        if landmark_cleared:
             sounds.stop_hum()
             return "end"
         pygame.display.flip()
@@ -863,7 +881,7 @@ def runGame():
         # Once the landmark appears, the timer's job is done - it hands off
         # to a prompt naming the actual thing to reach
         if landmark:
-            live_time = "Fly to " + level["landmark_name"] + "!"
+            live_time = "Fly over " + level["landmark_name"] + "!"
         elif level.get("time_limit") is not None:
             live_time += "/" + str(level["time_limit"])
         timer_color = level.get("timer_color", (0, 0, 0))
@@ -930,8 +948,10 @@ def runEndScreen():
     # frame. Reaching the level's point goal is "success" everywhere: Speed
     # Run's race can only end this way, so this is always true there;
     # Adventure's round can end via lives or the clock without ever
-    # crossing the goal, so this is the real win/lose split
-    reached_goal = any(p.score >= level["point_goal"] for p in players)
+    # crossing the goal, so this is the real win/lose split. Crashing into
+    # the landmark overrides all of that - it's an automatic fail no matter
+    # the score, the same way "hitting" rather than "flying over" was meant
+    reached_goal = not landmark_crashed and any(p.score >= level["point_goal"] for p in players)
     next_index = level_index + 1
     has_next = next_index < len(mode["levels"])
 
@@ -996,7 +1016,9 @@ def runEndScreen():
             # A failure needs a reason; a success is self-explanatory from
             # the score alone, so it gets no subtitle
             if not reached_goal:
-                if players[0].lives is not None and players[0].lives <= 0:
+                if landmark_crashed:
+                    reason = "Crashed into " + level["landmark_name"] + "!"
+                elif players[0].lives is not None and players[0].lives <= 0:
                     reason = "Out of lives!"
                 else:
                     reason = "Time's up!"
