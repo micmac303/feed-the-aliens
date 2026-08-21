@@ -733,10 +733,13 @@ def runInstructions():
             move = space_font.render(players[0].controls_text + " to move", True, (199, 199, 199))
             screen.blit(move, (500 - move.get_width() // 2, 340))
             if level.get("landmark"):
-                finish = points_font.render(
-                    "When time's up, fly to " + level["landmark_name"] + " to finish!",
-                    True, (199, 199, 199))
-                screen.blit(finish, (500 - finish.get_width() // 2, 400))
+                # Sits in the one gap free of both the legend (which claims
+                # the shield's spot right below "to move") and the
+                # highscore table on the right - short wording is load
+                # bearing, there isn't width to spare between them
+                finish = points_font.render("Reach " + level["landmark_name"] + " to finish!",
+                                            True, (199, 199, 199))
+                screen.blit(finish, (500 - finish.get_width() // 2, 470))
         else:
             screen.blit(instruction_font.render("Collect the animals to score points", True, (97, 8, 207)), (220, 130))
             screen.blit(instruction_font.render("Avoid the hazards", True, (97, 8, 207)), (220, 180))
