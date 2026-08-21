@@ -24,6 +24,7 @@ timer_font = pygame.font.SysFont("impact", 60)
 huge_font = pygame.font.SysFont("impact", 352)
 score_font = pygame.font.SysFont("impact", 120)
 points_font = pygame.font.SysFont("impact", 32)
+tagline_font = pygame.font.SysFont("impact", 22)
 instruction_font = pygame.font.SysFont("ebrima", 38)
 space_font = pygame.font.SysFont("impact", 40)
 title_font = pygame.font.SysFont("impact", 90)
@@ -645,8 +646,8 @@ def runStartScreen():
         # One row per mode - name plus tagline - with the selected one in gold
         for i, m in enumerate(MODES):
             color = (224, 185, 9) if i == selected else (120, 120, 120)
-            screen.blit(space_font.render(("> " if i == selected else "   ") + m["name"], True, color), (330, 250 + i * 110))
-            screen.blit(points_font.render(m["tagline"], True, color), (360, 298 + i * 110))
+            screen.blit(space_font.render(("> " if i == selected else "   ") + m["name"], True, color), (330, 200 + i * 110))
+            screen.blit(tagline_font.render(m["tagline"], True, color), (360, 248 + i * 110))
         screen.blit(ufo1, (500 - 128 - 24, 455))
         screen.blit(ufo2, (500 + 24, 455))
         for event in pygame.event.get():
