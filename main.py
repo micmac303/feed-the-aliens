@@ -933,7 +933,7 @@ def runGame():
         for animal in animals:
             animal.draw(screen)
         if paused:
-            banner = space_font.render("PAUSED - press P to resume, ESC to quit", True, (199, 199, 199))
+            banner = space_font.render("PAUSED - press P to resume, ESC for main menu", True, (199, 199, 199))
             screen.blit(banner, (500 - banner.get_width() // 2, 280))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -944,11 +944,11 @@ def runGame():
                 if event.key == pygame.K_p:
                     paused = not paused
                     sounds.play("menu_move")
-                # ESC quits, but only from the pause screen so a stray
-                # keypress mid-game cannot end the round
+                # ESC returns to the main menu, but only from the pause
+                # screen so a stray keypress mid-game cannot end the round
                 if event.key == pygame.K_ESCAPE and paused:
                     sounds.stop_hum()
-                    return "quit"
+                    return "start"
 
 
 def runEndScreen():
