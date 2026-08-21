@@ -232,7 +232,7 @@ UK_LEVEL = {
 }
 
 # Level 2. The same cast as the UK, with the cockerel - France's national
-# symbol - standing in for the fox.
+# symbol - standing in for the swan, and the boar standing in for the fox.
 FRANCE_LEVEL = {
     "name": "Level 2 - France",
     "point_goal": 100,
@@ -249,8 +249,8 @@ FRANCE_LEVEL = {
     "animals": {
         "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
         "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
-        "images/cockerel.png": {"effect": "points", "value": 5, "legend": "Cockerel +5"},
-        "images/swan.png": {"effect": "points", "value": 10, "legend": "Swan +10",
+        "images/boar.png": {"effect": "points", "value": 5, "legend": "Boar +5"},
+        "images/cockerel.png": {"effect": "points", "value": 10, "legend": "Cockerel +10",
                             "speed": 10, "recycle_x": 3200},
         "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
@@ -258,12 +258,12 @@ FRANCE_LEVEL = {
                            "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
-    "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/cockerel.png",
+    "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/boar.png",
                       "images/jet.png", "images/paris-tram.png"],
-    "rare_animal_images": ["images/shield.png", "images/swan.png"],
+    "rare_animal_images": ["images/shield.png", "images/cockerel.png"],
     "legend_layout": [
-        ("images/swan.png", (30, 30), (100, 40)),
-        ("images/cockerel.png", (30, 130), (100, 140)),
+        ("images/cockerel.png", (30, 30), (100, 40)),
+        ("images/boar.png", (30, 130), (100, 140)),
         ("images/squirrel.png", (30, 230), (100, 240)),
         ("images/hedgehog.png", (30, 330), (100, 340)),
         ("images/jet.png", (910, 30), (790, 40)),
