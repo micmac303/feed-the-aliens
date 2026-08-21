@@ -101,6 +101,14 @@ player2_img = loadImage("images/021-ufo.png")
 
 animals = []
 
+# A level's finish line: None until level["time_limit"] elapses, then a
+# fixed Landmark a UFO must reach to end the round (see the "landmark" key
+# on level dicts). landmark_reached flips once any player's hitbox touches
+# it - runGame() reads that the same way it reads lives/score, rather than
+# updateGame() deciding a screen transition itself.
+landmark = None
+landmark_reached = False
+
 # Sound events the sim emits, one name per thing that happened ("collect",
 # "explosion", ...). The sim only ever appends names here - it never touches
 # the mixer - and runGame() drains the list after each sim step and plays
@@ -180,6 +188,11 @@ UK_LEVEL = {
     # Optional - shown next to the level name on instructions and next to
     # the timer in game. Levels without a flag simply don't set this key
     "flag": "images/uk.png",
+    # Optional - once time_limit elapses, this appears on the field instead
+    # of the round ending outright; a UFO must reach it to finish. Levels
+    # without a landmark keep the old behaviour: time_limit ends it directly
+    "landmark": "images/big-ben.png",
+    "landmark_name": "Big Ben",
     "animals": {
         "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
         "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
@@ -214,6 +227,8 @@ FRANCE_LEVEL = {
     "time_limit": 30,
     "background_color": (255, 255, 255),
     "flag": "images/france.png",
+    "landmark": "images/eiffel-tower.png",
+    "landmark_name": "the Eiffel Tower",
     "animals": {
         "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
         "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
@@ -330,6 +345,21 @@ class Animal:
         # Left of x = -1000 everything moves at 5 so the staggered spawn queue
         # keeps its pacing; an eagle only speeds up once it is clear of it
         self.x += (self.speed if self.x >= -1000 else 5) * dt
+
+    def draw(self, screen):
+        screen.blit(self.img, (self.x, self.y))
+
+
+# A level's finish line: fixed position, no movement, no recycling - the
+# opposite of Animal. Its rect is the full sprite (not a shrunk hitbox like
+# Player/Animal use), deliberately generous since it is the target to hit,
+# not an obstacle to dodge.
+class Landmark:
+    def __init__(self, image_path):
+        self.img = pygame.transform.smoothscale(loadImage(image_path), (140, 140))
+        self.x = 820
+        self.y = 230
+        self.rect = pygame.Rect(self.x, self.y, 140, 140)
 
     def draw(self, screen):
         screen.blit(self.img, (self.x, self.y))
@@ -469,6 +499,8 @@ def keyboardIntents(pressed, controls):
 # collisions and scoring. No drawing and no input reads - this is the function
 # a headless server would run. all_intents lines up with players by index
 def updateGame(all_intents, dt):
+    global landmark, landmark_reached
+
     for p, intents in zip(players, all_intents):
         p.update(intents, dt)
     for animal in animals:
@@ -481,6 +513,17 @@ def updateGame(all_intents, dt):
                 animal.y = 1000
                 p.collect(animal.image_name, [o for o in players if o is not p])
 
+    # A level with a landmark doesn't end on the clock - time_limit instead
+    # marks when the finish line appears, and the round ends once a UFO
+    # actually reaches it
+    if landmark is None and level.get("landmark") and level.get("time_limit") is not None \
+            and current_time / 1000 >= level["time_limit"]:
+        landmark = Landmark(level["landmark"])
+    if landmark is not None and not landmark_reached:
+        for p in players:
+            if p.rect.colliderect(landmark.rect):
+                landmark_reached = True
+
 
 # Reset everything that belongs to a single round. Called once at startup and
 # again on restart, so a starting value only ever has to be written here.
@@ -489,6 +532,7 @@ def newRound(seed=None):
     global players, rng, level, level_index
     global scores, trophy, chosen_color
     global current_time, last_time
+    global landmark, landmark_reached
 
     # Every roll the sim makes (spawns, gift coin flips, background colour)
     # comes from this generator. Pass a seed to replay a round exactly - the
@@ -534,6 +578,9 @@ def newRound(seed=None):
     animals.clear()
     for i in range(0, 27):
         animals.append(Animal(slot=i))
+
+    landmark = None
+    landmark_reached = False
 
     sound_events.clear()
 
@@ -685,6 +732,11 @@ def runInstructions():
             screen.blit(pygame.transform.smoothscale(players[0].img, (128, 128)), (436, 195))
             move = space_font.render(players[0].controls_text + " to move", True, (199, 199, 199))
             screen.blit(move, (500 - move.get_width() // 2, 340))
+            if level.get("landmark"):
+                finish = points_font.render(
+                    "When time's up, fly to " + level["landmark_name"] + " to finish!",
+                    True, (199, 199, 199))
+                screen.blit(finish, (500 - finish.get_width() // 2, 400))
         else:
             screen.blit(instruction_font.render("Collect the animals to score points", True, (97, 8, 207)), (220, 130))
             screen.blit(instruction_font.render("Avoid the hazards", True, (97, 8, 207)), (220, 180))
@@ -749,12 +801,22 @@ def runGame():
         if any(p.lives is not None and p.lives <= 0 and p.explosion_timer <= 0 for p in players):
             sounds.stop_hum()
             return "end"
-        # A level can cap the round length; running out is also game over
-        if level.get("time_limit") is not None and current_time / 1000 >= level["time_limit"]:
+        # A level can cap the round length; running out is also game over -
+        # unless it has a landmark, in which case reaching *that* ends the
+        # round instead (checked next), not the clock directly
+        if level.get("time_limit") is not None and level.get("landmark") is None \
+                and current_time / 1000 >= level["time_limit"]:
+            sounds.stop_hum()
+            return "end"
+        if landmark_reached:
             sounds.stop_hum()
             return "end"
         pygame.display.flip()
         screen.fill(chosen_color)
+        # The landmark is scenery, not a gameplay element - drawn first so
+        # animals and the UFO both fly over it, never under it
+        if landmark:
+            landmark.draw(screen)
         if paused:
             # A frozen field gets a silent engine too
             sounds.set_hum_level("paused")
@@ -784,9 +846,13 @@ def runGame():
         # the slim score/lives bar; with a time limit it reads elapsed/limit
         # so the player can see how much of it is left. Two-player keeps the
         # big labelled timer, uncapped, as before
+        # Once the landmark appears, the timer's job is done - it hands off
+        # to a prompt naming the actual thing to reach
+        if landmark:
+            live_time = "Fly to " + level["landmark_name"] + "!"
+        elif level.get("time_limit") is not None:
+            live_time += "/" + str(level["time_limit"])
         if mode["player_count"] == 1:
-            if level.get("time_limit") is not None:
-                live_time += "/" + str(level["time_limit"])
             t = space_font.render(live_time, True, (0, 0, 0))
             # A level's flag (e.g. the UK's Union Jack) sits beside its
             # timer too, as a centred pair
@@ -800,7 +866,7 @@ def runGame():
             else:
                 screen.blit(t, (500 - t.get_width() // 2, 5))
         else:
-            time_surf = timer_font.render("Time: " + live_time, True, (0, 0, 0))
+            time_surf = timer_font.render(("" if landmark else "Time: ") + live_time, True, (0, 0, 0))
             if level.get("flag"):
                 flag = loadImage(level["flag"])
                 screen.blit(flag, (320 - flag.get_width() - 10, 30 - (flag.get_height() - time_surf.get_height()) // 2))
