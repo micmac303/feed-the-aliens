@@ -156,6 +156,9 @@ UK_LEVEL = {
     "time_limit": 30,
     # A fixed background instead of newRound()'s random pick
     "background_color": (255, 255, 255),
+    # Optional - shown next to the level name on instructions and next to
+    # the timer in game. Levels without a flag simply don't set this key
+    "flag": "images/uk.png",
     "animals": {
         "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
         "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
@@ -546,7 +549,17 @@ def runInstructions():
             # centred down the middle; the legend keeps the side columns
             name = instruction_font.render(level["name"] or mode["tagline"],
                                            True, (224, 185, 9) if level["name"] else (97, 8, 207))
-            screen.blit(name, (500 - name.get_width() // 2, 130))
+            # A level can carry a flag icon (e.g. the UK's Union Jack) shown
+            # beside its name, as a centred pair
+            flag = loadImage(level["flag"]) if level.get("flag") else None
+            if flag:
+                row_width = flag.get_width() + 10 + name.get_width()
+                row_x = 500 - row_width // 2
+                row_h = max(flag.get_height(), name.get_height())
+                screen.blit(flag, (row_x, 130 + (row_h - flag.get_height()) // 2))
+                screen.blit(name, (row_x + flag.get_width() + 10, 130 + (row_h - name.get_height()) // 2))
+            else:
+                screen.blit(name, (500 - name.get_width() // 2, 130))
             screen.blit(pygame.transform.smoothscale(players[0].img, (128, 128)), (436, 195))
             move = space_font.render(players[0].controls_text + " to move", True, (199, 199, 199))
             screen.blit(move, (500 - move.get_width() // 2, 340))
@@ -556,7 +569,11 @@ def runInstructions():
             # Third line: the level name when the level has one (Adventure's
             # countries), otherwise the mode tagline
             third_line = level["name"] or mode["tagline"]
-            screen.blit(instruction_font.render(third_line, True, (224, 185, 9) if level["name"] else (97, 8, 207)), (220, 230))
+            third_surf = instruction_font.render(third_line, True, (224, 185, 9) if level["name"] else (97, 8, 207))
+            if level.get("flag"):
+                flag = loadImage(level["flag"])
+                screen.blit(flag, (220 - flag.get_width() - 10, 230 - (flag.get_height() - third_surf.get_height()) // 2))
+            screen.blit(third_surf, (220, 230))
             # Controls, one entry per seat, so this screen matches the mode
             controls = "   ".join("P" + str(p.number) + ": " + p.controls_text for p in players)
             screen.blit(space_font.render(controls, True, (199, 199, 199)), (220, 280))
@@ -649,9 +666,23 @@ def runGame():
             if level.get("time_limit") is not None:
                 live_time += "/" + str(level["time_limit"])
             t = space_font.render(live_time, True, (0, 0, 0))
-            screen.blit(t, (500 - t.get_width() // 2, 5))
+            # A level's flag (e.g. the UK's Union Jack) sits beside its
+            # timer too, as a centred pair
+            if level.get("flag"):
+                flag = loadImage(level["flag"])
+                row_width = flag.get_width() + 10 + t.get_width()
+                row_x = 500 - row_width // 2
+                row_h = max(flag.get_height(), t.get_height())
+                screen.blit(flag, (row_x, 5 + (row_h - flag.get_height()) // 2))
+                screen.blit(t, (row_x + flag.get_width() + 10, 5 + (row_h - t.get_height()) // 2))
+            else:
+                screen.blit(t, (500 - t.get_width() // 2, 5))
         else:
-            screen.blit(timer_font.render("Time: " + live_time, True, (0, 0, 0)), (320, 30))
+            time_surf = timer_font.render("Time: " + live_time, True, (0, 0, 0))
+            if level.get("flag"):
+                flag = loadImage(level["flag"])
+                screen.blit(flag, (320 - flag.get_width() - 10, 30 - (flag.get_height() - time_surf.get_height()) // 2))
+            screen.blit(time_surf, (320, 30))
         for p in players:
             p.draw_hud(screen)
         # Draw players; player 1 blits last, on top
