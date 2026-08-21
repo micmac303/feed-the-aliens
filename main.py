@@ -297,13 +297,19 @@ class Player:
                     (self.x, self.y))
 
     def draw_hud(self, screen):
-        screen.blit(points_font.render(self.label, True, self.color), (self.hud_x, 0))
-        screen.blit(points_font.render(self.controls_text, True, self.color), (self.hud_x, 30))
+        # Solo HUD is a slim top bar - score top left, time top centre
+        # (drawn in runGame), lives top right - so no player label, no
+        # controls reminder and no giant background score
+        if len(players) == 1:
+            screen.blit(space_font.render(str(self.score), True, self.score_color), (20, 5))
+        else:
+            screen.blit(points_font.render(self.label, True, self.color), (self.hud_x, 0))
+            screen.blit(points_font.render(self.controls_text, True, self.color), (self.hud_x, 30))
+            screen.blit(huge_font.render(str(self.score), True, self.score_color), (self.score_x, 150))
         # Remaining lives as a row of small UFOs in the top right corner
         if self.lives is not None:
             for i in range(max(self.lives, 0)):
                 screen.blit(self.small_img, (990 - (i + 1) * 40, 8))
-        screen.blit(huge_font.render(str(self.score), True, self.score_color), (self.score_x, 150))
 
     # Apply one collected animal, looked up in the level's animals table.
     # opponents is every other player, so in a one-player mode an opponent
@@ -567,7 +573,13 @@ def runGame():
         # Don't pace with tick(60) instead: its sleep drifts against the real
         # refresh rate and skips a frame about once a second, a visible lurch
         clock.tick(240)
-        screen.blit(timer_font.render("Time: " + str(round(current_time / 1000, 2)), True, (0, 0, 0)), (320, 30))
+        # Solo shows just the number, small and at the very top, to match
+        # the slim score/lives bar; two-player keeps the big labelled timer
+        if mode["player_count"] == 1:
+            t = space_font.render(str(round(current_time / 1000, 2)), True, (0, 0, 0))
+            screen.blit(t, (500 - t.get_width() // 2, 5))
+        else:
+            screen.blit(timer_font.render("Time: " + str(round(current_time / 1000, 2)), True, (0, 0, 0)), (320, 30))
         for p in players:
             p.draw_hud(screen)
         # Draw players; player 1 blits last, on top
