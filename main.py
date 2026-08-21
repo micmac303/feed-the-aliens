@@ -326,7 +326,7 @@ for m in MODES:
 # when collected stays in the level's animals table - the object only carries
 # movement state and its type tag.
 class Animal:
-    def __init__(self, slot=0):
+    def __init__(self, slot=0, start_offset=1000):
         if rng.randint(1, 8) == 8:
             self.image_name = level["rare_animal_images"][rng.randint(0, len(level["rare_animal_images"]) - 1)]
         else:
@@ -336,8 +336,11 @@ class Animal:
         # own hitbox
         self.img = loadImage(self.image_name)
         self.rect = self.img.get_rect()
-        # slot staggers the 27 starting animals off the left edge
-        self.x = ((slot + 1) * -81) - 1000
+        # slot staggers the 27 starting animals off the left edge. start_offset
+        # only matters for the initial newRound() batch (recycled animals keep
+        # the default 1000, same as before) - a smaller one shortens how long
+        # the field stays empty right after a round begins
+        self.x = ((slot + 1) * -81) - start_offset
         animal_type = level["animals"][self.image_name]
         # Most animals spawn anywhere in the field's vertical band; the table
         # entry can restrict that (the jet only flies the top half, the bus
@@ -606,7 +609,7 @@ def newRound(seed=None):
 
     animals.clear()
     for i in range(0, 27):
-        animals.append(Animal(slot=i))
+        animals.append(Animal(slot=i, start_offset=250))
 
     landmark = None
     landmark_cleared = False
