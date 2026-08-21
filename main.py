@@ -31,28 +31,28 @@ colours = [(49, 201, 235), (34, 52, 153), (50, 92, 166), (89, 125, 189), (89, 14
            (171, 173, 184), (194, 197, 209), (226, 204, 227), (173, 174, 179), (204, 197, 212), (107, 90, 91),  # Gray
            ]
 
-# Highscores are player data, not source, so Highscore.txt is not in git.
-# A fresh clone starts from these defaults.
-default_scores = [30.0, 40.0, 50.0, 60.0, 70.0]
+# Highscores are player data, not source, so the files below are not in git.
+# Each mode owns its own file and its own starting defaults - Speed Run
+# tracks times (lower is better), Adventure tracks points (higher is better)
 
 
-def saveScores(score_list):
-    with open("Highscore.txt", "w") as scores_file:
+def saveScores(path, score_list):
+    with open(path, "w") as scores_file:
         scores_file.write(" ".join(str(x) for x in score_list))
 
 
 # Recreates the file if it is missing, empty, corrupt or short, so the game
 # never crashes on bad data.
-def loadScores():
+def loadScores(path, defaults):
     try:
-        with open("Highscore.txt", "r") as scores_file:
+        with open(path, "r") as scores_file:
             loaded = sorted(map(float, scores_file.read().split()))[:5]
         if len(loaded) < 5:
             raise ValueError("not enough scores")
         return loaded
     except (OSError, ValueError):
-        saveScores(default_scores)
-        return list(default_scores)
+        saveScores(path, defaults)
+        return list(defaults)
 
 
 # Images are loaded from disk once and reused. The instructions screen
@@ -139,9 +139,8 @@ UK_LEVEL = {
     "name": "Level 1 - United Kingdom",
     "point_goal": 100,
     "time_limit": 60,
-    # A fixed background instead of newRound()'s random pick - reuses one of
-    # the game's existing purple tones for a mid purple that still matches
-    "background_color": (120, 76, 207),
+    # A fixed background instead of newRound()'s random pick
+    "background_color": (255, 255, 255),
     "animals": {
         "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
         "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
@@ -182,15 +181,24 @@ MODES = [
      "tagline": "The first to 100 points wins",
      "player_count": 2,
      "saves_highscore": True,
+     "score_type": "time",  # lower is better
+     "highscore_file": "Highscore.txt",
+     "default_scores": [30.0, 40.0, 50.0, 60.0, 70.0],
+     # Reaching the goal ends the race immediately - that is the whole game
+     "ends_on_goal": True,
      # No lives in a race - deadly animals only exist in Adventure levels
      "lives": None,
      "levels": [CLASSIC_LEVEL]},
     {"name": "Adventure",
      "tagline": "One player - eat your way around the world",
      "player_count": 1,
-     # Solo times are not comparable with two-player races, so they stay out
-     # of Highscore.txt
-     "saves_highscore": False,
+     "saves_highscore": True,
+     "score_type": "points",  # higher is better
+     "highscore_file": "AdventureHighscore.txt",
+     "default_scores": [10.0, 20.0, 30.0, 40.0, 50.0],
+     # The point goal does not end the round - the player keeps scoring
+     # against the clock/lives, chasing as high a total as possible
+     "ends_on_goal": False,
      "lives": 3,
      "levels": ADVENTURE_LEVELS},
 ]
@@ -433,7 +441,7 @@ def newRound(seed=None):
     for i in range(0, 27):
         animals.append(Animal(slot=i))
 
-    scores = loadScores()
+    scores = loadScores(mode["highscore_file"], mode["default_scores"])
     trophy = False
 
     current_time = 0
@@ -531,12 +539,16 @@ def runInstructions():
             screen.blit(space_font.render(controls, True, (199, 199, 199)), (220, 280))
         prompt = space_font.render("Press SPACE to start, ESC to change mode", True, (199, 199, 199))
         screen.blit(prompt, (500 - prompt.get_width() // 2, 550))
-        # Highscore - shown only in modes whose times go in the table
+        # Highscore - shown only in modes that keep a table. Stored ascending
+        # either way; points ranks best-first by reading it back to front
+        # (highest is best), time by reading it as stored (lowest is best)
         if mode["saves_highscore"]:
+            ranked = list(reversed(scores)) if mode["score_type"] == "points" else scores
             # Sits high enough that the fifth row clears the bottom prompt
             screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (720, 250))
             for i in range(0, 5):
-                screen.blit(space_font.render(str(i + 1) + "   " + str(scores[i]), True, (224, 185, 9)), (720, 305 + i * 45))
+                value = int(ranked[i]) if mode["score_type"] == "points" else ranked[i]
+                screen.blit(space_font.render(str(i + 1) + "   " + str(value), True, (224, 185, 9)), (720, 305 + i * 45))
         # Animal pictures, labelled from the level's animals table so the
         # legend cannot drift out of step with what the animals are worth
         for legend_name, image_at, label_at in level["legend_layout"]:
@@ -559,7 +571,9 @@ def runGame():
     temp = pygame.time.get_ticks()
     paused = False
     while True:
-        if any(p.score >= level["point_goal"] for p in players):
+        # Some modes end the instant the goal is hit (Speed Run's race);
+        # others let the player keep scoring against it (Adventure's chase)
+        if mode["ends_on_goal"] and any(p.score >= level["point_goal"] for p in players):
             return "end"
         # Out of lives ends the round too - but only after the explosion has
         # played out, so the player sees the blast before the end screen
@@ -594,8 +608,12 @@ def runGame():
         # especially once centred, since the digit change also shifts width
         live_time = "{:.1f}".format(current_time / 1000)
         # Solo shows just the number, small and at the very top, to match
-        # the slim score/lives bar; two-player keeps the big labelled timer
+        # the slim score/lives bar; with a time limit it reads elapsed/limit
+        # so the player can see how much of it is left. Two-player keeps the
+        # big labelled timer, uncapped, as before
         if mode["player_count"] == 1:
+            if level.get("time_limit") is not None:
+                live_time += "/" + str(level["time_limit"])
             t = space_font.render(live_time, True, (0, 0, 0))
             screen.blit(t, (500 - t.get_width() // 2, 5))
         else:
@@ -634,8 +652,12 @@ def runEndScreen():
         pygame.display.flip()
         screen.fill((0, 0, 0))
         screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (775, 280))
+        # Stored ascending either way; points ranks best-first by reading it
+        # back to front (highest is best), time as stored (lowest is best)
+        ranked = list(reversed(scores)) if mode["score_type"] == "points" else scores
         for i in range(0, 5):
-            screen.blit(space_font.render(str(i + 1) + "   " + str(scores[i]), True, (224, 185, 9)), (775, 340 + i * 50))
+            value = int(ranked[i]) if mode["score_type"] == "points" else ranked[i]
+            screen.blit(space_font.render(str(i + 1) + "   " + str(value), True, (224, 185, 9)), (775, 340 + i * 50))
         screen.blit(points_font.render("Press R to play again, M for main menu, Q to quit", True, (220, 220, 220)), (10, 550))
         screen.blit(timer_font.render("Time: " + str(round(current_time/1000, 2)), True, (199, 199, 199)), (350, 10))
         screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
@@ -645,7 +667,7 @@ def runEndScreen():
         # thing that ended the game, so changing the goal cannot leave the
         # winner unnamed
         for p in players:
-            if p.score >= level["point_goal"]:
+            if mode["ends_on_goal"] and p.score >= level["point_goal"]:
                 screen.blit(space_font.render(p.label + " WINS!", True, p.color), (355, 100))
                 screen.blit(p.img, (440, 150))
             # A round can end in defeat instead: the UFO ran out of lives
@@ -656,12 +678,24 @@ def runEndScreen():
             elif level.get("time_limit") is not None and current_time / 1000 >= level["time_limit"]:
                 screen.blit(space_font.render("TIME'S UP!", True, p.color), (355, 100))
                 screen.blit(p.img, (440, 150))
-        # Highscores, saved once per round rather than on every frame, and
-        # only in modes whose times belong in the table
-        if mode["saves_highscore"] and not trophy and current_time/1000 < scores[4]:
+        # Highscores, saved once per round rather than on every frame. The
+        # metric and the direction that counts as "better" both come from
+        # the mode: Speed Run's time is better low, Adventure's score is
+        # better high, so the "worst kept record" sits at opposite ends of
+        # the sorted list (index 4 for time, index 0 for points)
+        if mode["score_type"] == "points":
+            result_value = players[0].score
+            beats_worst = result_value > scores[0]
+        else:
+            result_value = round(current_time / 1000, 2)
+            beats_worst = result_value < scores[4]
+        if mode["saves_highscore"] and not trophy and beats_worst:
             trophy = True
-            scores = sorted(scores[:4] + [round(current_time/1000, 2)])
-            saveScores(scores)
+            if mode["score_type"] == "points":
+                scores = sorted(scores[1:] + [result_value])
+            else:
+                scores = sorted(scores[:4] + [result_value])
+            saveScores(mode["highscore_file"], scores)
         if trophy:
             screen.blit(space_font.render("New High Score!", True, (224, 185, 9)), (355, 380))
             screen.blit(loadImage("images/001-trophy.png"), (440, 430))

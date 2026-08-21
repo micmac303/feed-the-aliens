@@ -132,6 +132,7 @@ dmypy.json
 .idea
 # Local high score data, not source
 Highscore.txt
+AdventureHighscore.txt
 
 # macOS
 .DS_Store
