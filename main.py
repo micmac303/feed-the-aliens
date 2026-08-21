@@ -754,7 +754,7 @@ def runInstructions():
             # Controls, one entry per seat, so this screen matches the mode
             controls = "   ".join("P" + str(p.number) + ": " + p.controls_text for p in players)
             screen.blit(space_font.render(controls, True, (199, 199, 199)), (220, 280))
-        prompt = space_font.render("Press SPACE to start, ESC to change mode", True, (199, 199, 199))
+        prompt = points_font.render("Enter to start, ESC to go back", True, (199, 199, 199))
         screen.blit(prompt, (500 - prompt.get_width() // 2, 550))
         # Highscore - shown only in modes that keep a table. Stored ascending
         # either way; points ranks best-first by reading it back to front
@@ -775,7 +775,7 @@ def runInstructions():
             if event.type == pygame.QUIT:
                 return "quit"
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_RETURN:
                     sounds.play("menu_select")
                     return "game"
                 # Step back one screen, e.g. after picking by accident -
