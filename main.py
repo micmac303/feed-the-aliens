@@ -85,6 +85,8 @@ animals = []
 #   opponent - add value (negative) to the *other* player's score
 #   shield   - grant a single use shield
 #   random   - plus or minus value, a coin flip
+#   deadly   - the player explodes and loses a life (a shield absorbs the
+#              hit); only meaningful in modes that grant lives
 # An entry may also carry "speed" and "recycle_x" (defaults 5 and 1100) for
 # animals that fly fast and far off the right edge before recycling.
 #
@@ -130,41 +132,35 @@ CLASSIC_LEVEL = {
     ],
 }
 
-# Level 1 of the Adventure world tour. The art is placeholders - existing
-# sprites standing in for the UK animals until real icons land. To swap in
-# real art: drop the PNG into images/ and rename the path in the three
-# places it appears here (animals key, spawn pool, legend row). The fox is
-# an obstacle rather than an opponent effect because Adventure is solo.
+# Level 1 of the Adventure world tour. All art is the real UK set.
 UK_LEVEL = {
     "name": "Level 1 - United Kingdom",
     "point_goal": 50,
     "animals": {
-        "images/001-hen.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
-        "images/002-rabbit.png": {"effect": "points", "value": 1, "legend": "Squirrel +1"},
-        "images/003-cow.png": {"effect": "points", "value": 3, "legend": "Sheep +3"},
-        "images/003-elephant.png": {"effect": "points", "value": 5, "legend": "Bulldog +5"},
-        "images/001-eagle.png": {"effect": "points", "value": 8, "legend": "Swan +8",
-                                 "speed": 10, "recycle_x": 3200},
-        "images/003-tiger.png": {"effect": "obstacle", "value": -3, "legend": "Fox -3"},
-        "images/002-truck.png": {"effect": "obstacle", "value": -5, "legend": "Bus -5"},
+        "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
+        "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
+        "images/fox.png": {"effect": "points", "value": 5, "legend": "Fox +5"},
+        "images/swan.png": {"effect": "points", "value": 10, "legend": "Swan +10",
+                            "speed": 10, "recycle_x": 3200},
         "images/001-bomb.png": {"effect": "obstacle", "value": -2, "legend": "Bomb -2"},
+        "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "speed": 12, "recycle_x": 3200},
+        "images/bus.png": {"effect": "deadly", "value": None, "legend": "-1 life"},
         "images/001-star.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
         "images/001-gift.png": {"effect": "random", "value": 10, "legend": "Random +10 / -10"},
     },
-    "animal_images": ["images/003-cow.png", "images/001-hen.png", "images/003-elephant.png",
-                      "images/002-rabbit.png", "images/001-bomb.png", "images/002-truck.png",
-                      "images/003-tiger.png"],
-    "rare_animal_images": ["images/001-star.png", "images/001-eagle.png", "images/001-gift.png"],
+    "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/fox.png",
+                      "images/001-bomb.png", "images/jet.png", "images/bus.png"],
+    "rare_animal_images": ["images/001-star.png", "images/swan.png", "images/001-gift.png"],
     "legend_layout": [
-        ("images/001-eagle.png", (30, 30), (100, 40)),
-        ("images/003-elephant.png", (30, 130), (100, 140)),
-        ("images/003-cow.png", (30, 230), (100, 240)),
-        ("images/001-hen.png", (30, 330), (100, 340)),
-        ("images/002-rabbit.png", (30, 430), (100, 440)),
-        ("images/002-truck.png", (910, 30), (790, 40)),
-        ("images/001-bomb.png", (910, 130), (790, 140)),
+        ("images/swan.png", (30, 30), (100, 40)),
+        ("images/fox.png", (30, 130), (100, 140)),
+        ("images/squirrel.png", (30, 230), (100, 240)),
+        ("images/hedgehog.png", (30, 330), (100, 340)),
+        ("images/001-bomb.png", (910, 30), (790, 40)),
+        ("images/jet.png", (910, 130), (790, 140)),
+        ("images/bus.png", (910, 230), (790, 240)),
         ("images/001-gift.png", (340, 330), (420, 345)),
-        ("images/003-tiger.png", (340, 400), (420, 410)),
         ("images/001-star.png", (340, 470), (420, 480)),
     ],
 }
@@ -183,6 +179,8 @@ MODES = [
      "tagline": "The first to 100 points wins",
      "player_count": 2,
      "saves_highscore": True,
+     # No lives in a race - deadly animals only exist in Adventure levels
+     "lives": None,
      "levels": [CLASSIC_LEVEL]},
     {"name": "Adventure",
      "tagline": "One player - eat your way around the world",
@@ -190,6 +188,7 @@ MODES = [
      # Solo times are not comparable with two-player races, so they stay out
      # of Highscore.txt
      "saves_highscore": False,
+     "lives": 3,
      "levels": ADVENTURE_LEVELS},
 ]
 mode = MODES[0]
@@ -244,7 +243,7 @@ class Animal:
 # there is no per-player duplication; newRound() builds two fresh ones, which
 # is what resets score/position/shield each round.
 class Player:
-    def __init__(self, img, start_x, number, controls, controls_text, color, score_color, hud_x, score_x):
+    def __init__(self, img, start_x, number, controls, controls_text, color, score_color, hud_x, score_x, lives=None):
         # Identity: fixed for the whole session
         self.img = img
         self.number = number              # 1-based, and the future network id
@@ -260,6 +259,11 @@ class Player:
         self.y = 30
         self.score = 0
         self.shield = False
+        # None means the mode has no lives concept (deadly animals then
+        # cannot end the round); explosion_timer counts down in frames while
+        # the death explosion is on screen
+        self.lives = lives
+        self.explosion_timer = 0
         self.rect = img.get_rect()
 
     # Movement constants are deliberately asymmetric (left 5.8, right 7.0).
@@ -283,16 +287,22 @@ class Player:
     def update(self, intents, dt):
         self.rect = pygame.Rect(self.x + 16, self.y + 16, 32, 32)
         self.move(intents, dt)
+        if self.explosion_timer > 0:
+            self.explosion_timer -= dt
 
     def draw(self, screen):
         if self.shield:
             pygame.draw.rect(screen, (66, 239, 245), (self.x, self.y, 64, 64), 6)
         pygame.draw.rect(screen, (0, 0, 0), (self.x + 16, self.y + 16, 32, 32), 0)
-        screen.blit(self.img, (self.x, self.y))
+        # While the death explosion plays the UFO is drawn as the blast
+        screen.blit(loadImage("images/explosion.png") if self.explosion_timer > 0 else self.img,
+                    (self.x, self.y))
 
     def draw_hud(self, screen):
         screen.blit(points_font.render(self.label, True, self.color), (self.hud_x, 0))
         screen.blit(points_font.render(self.controls_text, True, self.color), (self.hud_x, 30))
+        if self.lives is not None:
+            screen.blit(points_font.render("LIVES: " + str(self.lives), True, self.color), (self.hud_x, 60))
         screen.blit(huge_font.render(str(self.score), True, self.score_color), (self.score_x, 150))
 
     # Apply one collected animal, looked up in the level's animals table.
@@ -314,6 +324,14 @@ class Player:
         elif effect == "opponent":
             for opponent in opponents:
                 opponent.score += value
+        elif effect == "deadly":
+            # A shield saves the life; otherwise the UFO blows up. The round
+            # ends in runGame() once lives hit 0 and the explosion has played
+            if self.shield:
+                self.shield = False
+            elif self.lives is not None:
+                self.lives -= 1
+                self.explosion_timer = 50
         elif effect == "shield":
             self.shield = True
         elif effect == "random":
@@ -375,13 +393,13 @@ def newRound(seed=None):
                          "up": pygame.K_w, "down": pygame.K_s},
                controls_text="WASD",
                color=(240, 90, 26), score_color=(181, 91, 53),
-               hud_x=100, score_x=20),
+               hud_x=100, score_x=20, lives=mode["lives"]),
         Player(player2_img, start_x=700, number=2,
                controls={"left": pygame.K_LEFT, "right": pygame.K_RIGHT,
                          "up": pygame.K_UP, "down": pygame.K_DOWN},
                controls_text="ARROW KEYS",
                color=(97, 8, 207), score_color=(125, 99, 171),
-               hud_x=780, score_x=530),
+               hud_x=780, score_x=530, lives=mode["lives"]),
     ][:mode["player_count"]]
 
     animals.clear()
@@ -469,7 +487,7 @@ def runInstructions():
         # Controls, one entry per seat, so this screen matches the mode
         controls = "   ".join("P" + str(p.number) + ": " + p.controls_text for p in players)
         screen.blit(space_font.render(controls, True, (199, 199, 199)), (220, 280))
-        screen.blit(space_font.render("Press SPACE to start", True, (199, 199, 199)), (340, 550))
+        screen.blit(space_font.render("Press SPACE to start, ESC to change mode", True, (199, 199, 199)), (150, 550))
         # Highscore - shown only in modes whose times go in the table
         if mode["saves_highscore"]:
             screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (720, 280))
@@ -486,6 +504,9 @@ def runInstructions():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     return "game"
+                # Back to mode select, e.g. after picking a mode by accident
+                if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                    return "modes"
 
 
 def runGame():
@@ -494,6 +515,10 @@ def runGame():
     temp = pygame.time.get_ticks()
     while True:
         if any(p.score >= level["point_goal"] for p in players):
+            return "end"
+        # Out of lives ends the round too - but only after the explosion has
+        # played out, so the player sees the blast before the end screen
+        if any(p.lives is not None and p.lives <= 0 and p.explosion_timer <= 0 for p in players):
             return "end"
         pygame.display.flip()
         screen.fill(chosen_color)
@@ -547,6 +572,10 @@ def runEndScreen():
             if p.score >= level["point_goal"]:
                 screen.blit(space_font.render(p.label + " WINS!", True, p.color), (355, 100))
                 screen.blit(p.img, (440, 150))
+            # A round can end in defeat instead: the UFO ran out of lives
+            elif p.lives is not None and p.lives <= 0:
+                screen.blit(space_font.render("OUT OF LIVES!", True, p.color), (355, 100))
+                screen.blit(loadImage("images/explosion.png"), (440, 150))
         # Highscores, saved once per round rather than on every frame, and
         # only in modes whose times belong in the table
         if mode["saves_highscore"] and not trophy and current_time/1000 < scores[4]:

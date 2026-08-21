@@ -132,3 +132,6 @@ dmypy.json
 .idea
 # Local high score data, not source
 Highscore.txt
+
+# macOS
+.DS_Store
