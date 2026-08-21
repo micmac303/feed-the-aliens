@@ -152,7 +152,7 @@ CLASSIC_LEVEL = {
 UK_LEVEL = {
     "name": "Level 1 - United Kingdom",
     "point_goal": 100,
-    "time_limit": 60,
+    "time_limit": 30,
     # A fixed background instead of newRound()'s random pick
     "background_color": (255, 255, 255),
     "animals": {

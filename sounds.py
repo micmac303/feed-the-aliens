@@ -95,8 +95,12 @@ def init():
         "shield_up": [_notes([(523.25, 0.1), (784, 0.16)], 0.35, shape="sine")],
         "shield_break": [_noise(0.12, 0.6, 0.7)],
         "explosion": [_noise(0.7, 0.9, 0.08)],
-        "menu_move": [_tone(880, 880, 0.04, 0.2)],
-        "menu_select": [_notes([(660, 0.06), (990, 0.1)], 0.3)],
+        # Menu sounds are mechanical clicks (tiny noise bursts), not beeps:
+        # a light tick to move, and a click-clack pair to confirm
+        "menu_move": [_noise(0.018, 0.5, 0.85)],
+        "menu_select": [_noise(0.018, 0.5, 0.85)
+                        + [0.0] * int(_rate * 0.05)
+                        + _noise(0.03, 0.6, 0.35)],
         "jingle_win": [_notes([(523.25, 0.14), (659.25, 0.14), (784, 0.14),
                                (1046.5, 0.4)], 0.35)],
         "jingle_lose": [_notes([(392, 0.18), (329.63, 0.18), (261.63, 0.18),
