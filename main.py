@@ -142,26 +142,22 @@ UK_LEVEL = {
         "images/fox.png": {"effect": "points", "value": 5, "legend": "Fox +5"},
         "images/swan.png": {"effect": "points", "value": 10, "legend": "Swan +10",
                             "speed": 10, "recycle_x": 3200},
-        "images/001-bomb.png": {"effect": "obstacle", "value": -2, "legend": "Bomb -2"},
         "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "speed": 12, "recycle_x": 3200},
         "images/bus.png": {"effect": "deadly", "value": None, "legend": "-1 life"},
         "images/001-star.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
-        "images/001-gift.png": {"effect": "random", "value": 10, "legend": "Random +10 / -10"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/fox.png",
-                      "images/001-bomb.png", "images/jet.png", "images/bus.png"],
-    "rare_animal_images": ["images/001-star.png", "images/swan.png", "images/001-gift.png"],
+                      "images/jet.png", "images/bus.png"],
+    "rare_animal_images": ["images/001-star.png", "images/swan.png"],
     "legend_layout": [
         ("images/swan.png", (30, 30), (100, 40)),
         ("images/fox.png", (30, 130), (100, 140)),
         ("images/squirrel.png", (30, 230), (100, 240)),
         ("images/hedgehog.png", (30, 330), (100, 340)),
-        ("images/001-bomb.png", (910, 30), (790, 40)),
-        ("images/jet.png", (910, 130), (790, 140)),
-        ("images/bus.png", (910, 230), (790, 240)),
-        ("images/001-gift.png", (340, 330), (420, 345)),
-        ("images/001-star.png", (340, 470), (420, 480)),
+        ("images/jet.png", (910, 30), (790, 40)),
+        ("images/bus.png", (910, 130), (790, 140)),
+        ("images/001-star.png", (340, 400), (420, 410)),
     ],
 }
 
@@ -243,9 +239,11 @@ class Animal:
 # there is no per-player duplication; newRound() builds two fresh ones, which
 # is what resets score/position/shield each round.
 class Player:
-    def __init__(self, img, start_x, number, controls, controls_text, color, score_color, hud_x, score_x, lives=None):
+    def __init__(self, img, start_x, number, controls, controls_text, color, score_color, hud_x, score_x, lives=None, start_y=30):
         # Identity: fixed for the whole session
         self.img = img
+        # Half-size copy for the lives row in the top right corner
+        self.small_img = pygame.transform.smoothscale(img, (32, 32))
         self.number = number              # 1-based, and the future network id
         self.label = "PLAYER " + str(number)
         self.controls = controls          # {"left"/"right"/"up"/"down": key constant}
@@ -256,7 +254,7 @@ class Player:
         self.score_x = score_x
         # Round state: starts fresh because each round gets a fresh Player
         self.x = start_x
-        self.y = 30
+        self.y = start_y
         self.score = 0
         self.shield = False
         # None means the mode has no lives concept (deadly animals then
@@ -301,8 +299,10 @@ class Player:
     def draw_hud(self, screen):
         screen.blit(points_font.render(self.label, True, self.color), (self.hud_x, 0))
         screen.blit(points_font.render(self.controls_text, True, self.color), (self.hud_x, 30))
+        # Remaining lives as a row of small UFOs in the top right corner
         if self.lives is not None:
-            screen.blit(points_font.render("LIVES: " + str(self.lives), True, self.color), (self.hud_x, 60))
+            for i in range(max(self.lives, 0)):
+                screen.blit(self.small_img, (990 - (i + 1) * 40, 8))
         screen.blit(huge_font.render(str(self.score), True, self.score_color), (self.score_x, 150))
 
     # Apply one collected animal, looked up in the level's animals table.
@@ -386,21 +386,31 @@ def newRound(seed=None):
 
     # Fresh Player objects reset score, position and shield; the identity
     # arguments (controls, colours, HUD spots) are what tell the two apart.
-    # The mode decides how many of these seats are actually filled
-    players = [
-        Player(player_img, start_x=200, number=1,
-               controls={"left": pygame.K_a, "right": pygame.K_d,
-                         "up": pygame.K_w, "down": pygame.K_s},
-               controls_text="WASD",
-               color=(240, 90, 26), score_color=(181, 91, 53),
-               hud_x=100, score_x=20, lives=mode["lives"]),
-        Player(player2_img, start_x=700, number=2,
-               controls={"left": pygame.K_LEFT, "right": pygame.K_RIGHT,
-                         "up": pygame.K_UP, "down": pygame.K_DOWN},
-               controls_text="ARROW KEYS",
-               color=(97, 8, 207), score_color=(125, 99, 171),
-               hud_x=780, score_x=530, lives=mode["lives"]),
-    ][:mode["player_count"]]
+    # The mode decides the seat layout: solo modes get one seat on the arrow
+    # keys starting in the middle of the screen, two-player modes get the
+    # classic WASD-vs-arrows pair
+    arrow_controls = {"left": pygame.K_LEFT, "right": pygame.K_RIGHT,
+                      "up": pygame.K_UP, "down": pygame.K_DOWN}
+    if mode["player_count"] == 1:
+        players = [
+            Player(player_img, start_x=468, start_y=268, number=1,
+                   controls=arrow_controls, controls_text="ARROW KEYS",
+                   color=(240, 90, 26), score_color=(181, 91, 53),
+                   hud_x=100, score_x=20, lives=mode["lives"]),
+        ]
+    else:
+        players = [
+            Player(player_img, start_x=200, number=1,
+                   controls={"left": pygame.K_a, "right": pygame.K_d,
+                             "up": pygame.K_w, "down": pygame.K_s},
+                   controls_text="WASD",
+                   color=(240, 90, 26), score_color=(181, 91, 53),
+                   hud_x=100, score_x=20, lives=mode["lives"]),
+            Player(player2_img, start_x=700, number=2,
+                   controls=arrow_controls, controls_text="ARROW KEYS",
+                   color=(97, 8, 207), score_color=(125, 99, 171),
+                   hud_x=780, score_x=530, lives=mode["lives"]),
+        ][:mode["player_count"]]
 
     animals.clear()
     for i in range(0, 27):
@@ -513,6 +523,7 @@ def runGame():
     global current_time, last_time
 
     temp = pygame.time.get_ticks()
+    paused = False
     while True:
         if any(p.score >= level["point_goal"] for p in players):
             return "end"
@@ -522,13 +533,20 @@ def runGame():
             return "end"
         pygame.display.flip()
         screen.fill(chosen_color)
-        dt = time.time() - last_time
-        dt *= 60
-        last_time = time.time()
-        # Slow game on first frames
-        if dt > 2:
-            dt = 1.9
-        current_time = (pygame.time.get_ticks() - temp)
+        if paused:
+            # Freeze the round: slide the timer's start point forward so
+            # paused time never counts, and keep last_time fresh so dt does
+            # not jump on resume. The field still draws, it just never moves
+            temp = pygame.time.get_ticks() - current_time
+            last_time = time.time()
+        else:
+            dt = time.time() - last_time
+            dt *= 60
+            last_time = time.time()
+            # Slow game on first frames
+            if dt > 2:
+                dt = 1.9
+            current_time = (pygame.time.get_ticks() - temp)
         # vsync paces the loop (flip blocks until the refresh); this cap never
         # engages alongside it and only bounds the loop if vsync is unavailable.
         # Don't pace with tick(60) instead: its sleep drifts against the real
@@ -540,15 +558,21 @@ def runGame():
         # Draw players; player 1 blits last, on top
         for p in reversed(players):
             p.draw(screen)
-        # Read the keyboard here, then hand the sim nothing but intents
-        pressed = pygame.key.get_pressed()
-        updateGame([keyboardIntents(pressed, p.controls) for p in players], dt)
+        if not paused:
+            # Read the keyboard here, then hand the sim nothing but intents
+            pressed = pygame.key.get_pressed()
+            updateGame([keyboardIntents(pressed, p.controls) for p in players], dt)
         for animal in animals:
             animal.draw(screen)
+        if paused:
+            banner = space_font.render("PAUSED - press P to resume", True, (199, 199, 199))
+            screen.blit(banner, (500 - banner.get_width() // 2, 280))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 time.sleep(0.2)
                 return "quit"
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_p:
+                paused = not paused
 
 
 def runEndScreen():
