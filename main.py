@@ -272,7 +272,7 @@ FRANCE_LEVEL = {
     ],
 }
 
-# Level 3. The same cast again, with the stallion standing in for the
+# Level 3. The same cast again, with the wolf standing in for the
 # swan/cockerel and the fox back in its UK slot.
 ITALY_LEVEL = {
     "name": "Level 3 - Italy",
@@ -290,7 +290,7 @@ ITALY_LEVEL = {
         "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
         "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
         "images/fox.png": {"effect": "points", "value": 5, "legend": "Fox +5"},
-        "images/stallion.png": {"effect": "points", "value": 10, "legend": "Stallion +10",
+        "images/wolf.png": {"effect": "points", "value": 10, "legend": "Wolf +10",
                             "speed": 10, "recycle_x": 3200},
         "images/jet.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
@@ -300,9 +300,9 @@ ITALY_LEVEL = {
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/fox.png",
                       "images/jet.png", "images/vespa.png"],
-    "rare_animal_images": ["images/shield.png", "images/stallion.png"],
+    "rare_animal_images": ["images/shield.png", "images/wolf.png"],
     "legend_layout": [
-        ("images/stallion.png", (30, 30), (100, 40)),
+        ("images/wolf.png", (30, 30), (100, 40)),
         ("images/fox.png", (30, 130), (100, 140)),
         ("images/squirrel.png", (30, 230), (100, 240)),
         ("images/hedgehog.png", (30, 330), (100, 340)),
