@@ -573,13 +573,17 @@ def runGame():
         # Don't pace with tick(60) instead: its sleep drifts against the real
         # refresh rate and skips a frame about once a second, a visible lurch
         clock.tick(240)
+        # Rounded to one decimal (not two) so the display updates 10x less
+        # often - at hundredths it re-renders every frame and looks flashy,
+        # especially once centred, since the digit change also shifts width
+        live_time = "{:.1f}".format(current_time / 1000)
         # Solo shows just the number, small and at the very top, to match
         # the slim score/lives bar; two-player keeps the big labelled timer
         if mode["player_count"] == 1:
-            t = space_font.render(str(round(current_time / 1000, 2)), True, (0, 0, 0))
+            t = space_font.render(live_time, True, (0, 0, 0))
             screen.blit(t, (500 - t.get_width() // 2, 5))
         else:
-            screen.blit(timer_font.render("Time: " + str(round(current_time / 1000, 2)), True, (0, 0, 0)), (320, 30))
+            screen.blit(timer_font.render("Time: " + live_time, True, (0, 0, 0)), (320, 30))
         for p in players:
             p.draw_hud(screen)
         # Draw players; player 1 blits last, on top
