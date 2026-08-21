@@ -432,16 +432,19 @@ def newRound(seed=None):
 # title -> mode select -> instructions -> game.
 def runStartScreen():
     title = title_font.render("Feed The Aliens", True, (199, 199, 199))
+    prompt = space_font.render("Press SPACE to start", True, (199, 199, 199))
+    # The two player UFOs, blown up to twice sprite size for the title screen
+    ufo1 = pygame.transform.smoothscale(player_img, (128, 128))
+    ufo2 = pygame.transform.smoothscale(player2_img, (128, 128))
     while True:
         pygame.display.flip()
         screen.fill((0, 0, 0))
-        screen.blit(loadImage("images/006-ufo-1.png"), (490, -2))
-        screen.blit(loadImage("images/005-alien.png"), (220, 535))
-        screen.blit(loadImage("images/001-alien.png"), (660, 535))
-        # Just the title, centred, and the prompt - everything else moved to
-        # the mode select and instructions screens
-        screen.blit(title, (500 - title.get_width() // 2, 230))
-        screen.blit(space_font.render("Press SPACE to start", True, (199, 199, 199)), (340, 550))
+        # Title up top, the UFOs side by side in the middle, and the prompt
+        # at the bottom - everything centred on the 1000px width
+        screen.blit(title, (500 - title.get_width() // 2, 100))
+        screen.blit(ufo1, (500 - 128 - 24, 236))
+        screen.blit(ufo2, (500 + 24, 236))
+        screen.blit(prompt, (500 - prompt.get_width() // 2, 500))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit"
