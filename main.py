@@ -41,48 +41,71 @@ colours = [(49, 201, 235), (34, 52, 153), (50, 92, 166), (89, 125, 189), (89, 14
            ]
 
 # Highscores are player data, not source, so the files below are not in git.
-# Each *level* owns its own file and its own starting defaults, not the mode -
-# Adventure's countries each chase their own table rather than one shared
-# across the whole campaign. The mode only decides the metric: Speed Run
-# tracks times (lower is better), Adventure tracks points (higher is better)
+# Each *level* owns its own file - Adventure's countries each chase their own
+# records rather than one table shared across the whole campaign. The mode
+# only decides the metric: Speed Run tracks times (lower is better),
+# Adventure tracks points (higher is better).
+#
+# A level keeps two records rather than a top-five table: RECORD_BEST is the
+# best result ever, RECORD_CLEAN the best set without losing a single life.
+# The clean record is the harder target and is what keeps a level worth
+# replaying once the raw best is out of reach. Modes with no lives concept
+# (mode["lives"] is None - Speed Run's race) only have the first: a run with
+# no lives lost is not a meaningful thing there.
+#
+# Stored as one line of two space-separated tokens, "-" meaning "not set
+# yet", so an unplayed level shows a dash rather than an invented seed score.
+RECORD_BEST = 0
+RECORD_CLEAN = 1
+UNSET = "-"
 
 
-def saveScores(path, score_list):
-    with open(path, "w") as scores_file:
-        scores_file.write(" ".join(str(x) for x in score_list))
+def saveRecords(path, records):
+    with open(path, "w") as records_file:
+        records_file.write(" ".join(UNSET if v is None else str(v) for v in records))
 
 
-# Recreates the file if it is missing, empty, corrupt or short, so the game
-# never crashes on bad data.
-def loadScores(path, defaults):
+# Missing, empty or corrupt files degrade to "no records yet" rather than
+# crashing. Files written by the older five-score format are collapsed to a
+# single best rather than being read as nonsense - the top of the old table
+# is still a real result the player earned.
+def loadRecords(path):
     try:
-        with open(path, "r") as scores_file:
-            loaded = sorted(map(float, scores_file.read().split()))[:5]
-        if len(loaded) < 5:
-            raise ValueError("not enough scores")
-        return loaded
+        with open(path, "r") as records_file:
+            values = [None if t == UNSET else float(t) for t in records_file.read().split()]
     except (OSError, ValueError):
-        saveScores(path, defaults)
-        return list(defaults)
+        return [None, None]
+    if len(values) == 2:
+        return values
+    earned = [v for v in values if v is not None]
+    if not earned:
+        return [None, None]
+    return [min(earned) if mode["score_type"] == "time" else max(earned), None]
 
 
-# scores is stored ascending either way; points ranks best-first by reading
-# it back to front (highest is best), time by reading it as stored (lowest
-# is best). Shared by the instructions and end screens so the two can't
-# drift out of step on how a rank is read.
-def rankedScores():
-    return list(reversed(scores)) if mode["score_type"] == "points" else scores
+# Whether value is an improvement, which depends on the mode's metric: a
+# lower time is better, a higher score is better. An unset record is beaten
+# by anything.
+def beatsRecord(value, record):
+    if record is None:
+        return True
+    return value < record if mode["score_type"] == "time" else value > record
 
 
-def formatScoreValue(value):
+def formatRecord(value):
+    if value is None:
+        return UNSET
     return str(int(value)) if mode["score_type"] == "points" else str(value)
 
 
-# One compact "1: X   2: Y ..." line - used by the solo end screen, which
-# has no room to spare for a five-row list alongside everything else on it.
-def compactScoresLine(ranked):
-    return "High Scores:  " + "   ".join(
-        str(i + 1) + ": " + formatScoreValue(v) for i, v in enumerate(ranked))
+# The record rows to display, as (label, text) pairs - one row for modes
+# without lives, two for modes with them. Shared by the level-info screen
+# and both end-screen layouts so none of them can drift out of step.
+def recordRows():
+    rows = [("Best", formatRecord(records[RECORD_BEST]))]
+    if mode["lives"] is not None:
+        rows.append(("No deaths", formatRecord(records[RECORD_CLEAN])))
+    return rows
 
 
 # Campaign progress is player data too (gitignored like the highscores):
@@ -172,7 +195,6 @@ CLASSIC_LEVEL = {
     "name": None,  # Speed Run shows no level name
     "point_goal": 100,
     "highscore_file": "Highscore.txt",
-    "default_scores": [30.0, 40.0, 50.0, 60.0, 70.0],
     "animals": {
         "images/003-cow.png": {"effect": "points", "value": 3, "legend": "+3"},
         "images/001-hen.png": {"effect": "points", "value": 1, "legend": "+1"},
@@ -209,7 +231,6 @@ UK_LEVEL = {
     "name": "Level 1 - United Kingdom",
     "point_goal": 100,
     "highscore_file": "UKHighscore.txt",
-    "default_scores": [10.0, 20.0, 30.0, 40.0, 50.0],
     "time_limit": 30,
     # 2-star threshold; defaults to double point_goal when unset
     "two_star_score": 150,
@@ -262,7 +283,6 @@ FRANCE_LEVEL = {
     "name": "Level 2 - France",
     "point_goal": 100,
     "highscore_file": "FranceHighscore.txt",
-    "default_scores": [10.0, 20.0, 30.0, 40.0, 50.0],
     "time_limit": 30,
     "two_star_score": 150,
     "three_star_score": 175,
@@ -306,7 +326,6 @@ ITALY_LEVEL = {
     "name": "Level 3 - Italy",
     "point_goal": 100,
     "highscore_file": "ItalyHighscore.txt",
-    "default_scores": [10.0, 20.0, 30.0, 40.0, 50.0],
     "time_limit": 30,
     "two_star_score": 150,
     "three_star_score": 175,
@@ -349,7 +368,6 @@ SPAIN_LEVEL = {
     "name": "Level 4 - Spain",
     "point_goal": 100,
     "highscore_file": "SpainHighscore.txt",
-    "default_scores": [10.0, 20.0, 30.0, 40.0, 50.0],
     "time_limit": 30,
     "two_star_score": 150,
     "three_star_score": 175,
@@ -675,7 +693,7 @@ def updateGame(all_intents, dt):
 # Anything new that should start fresh each round belongs in this function.
 def newRound(seed=None):
     global players, rng, level, level_index
-    global scores, trophy, chosen_color
+    global records, trophy, chosen_color
     global current_time, last_time
     global landmark, landmark_cleared, landmark_crashed
 
@@ -730,7 +748,7 @@ def newRound(seed=None):
 
     sound_events.clear()
 
-    scores = loadScores(level["highscore_file"], level["default_scores"])
+    records = loadRecords(level["highscore_file"])
     trophy = False
 
     current_time = 0
@@ -985,15 +1003,18 @@ def runLevelInfo():
         for legend_name, image_at, label_at in level["legend_layout"]:
             screen.blit(loadImage(legend_name), image_at)
             screen.blit(points_font.render(level["animals"][legend_name]["legend"], True, (199, 199, 199)), label_at)
-        # Highscore - shown only in modes that keep a table. This is the
-        # active level's own table (each Adventure country tracks its own
-        # scores, not one shared across the whole campaign), so it changes
-        # as the player steps through the campaign
+        # Records - shown only in modes that keep them. These are the active
+        # level's own (each Adventure country tracks its own), so they change
+        # as the player steps through the campaign. Labels sit at the column's
+        # left edge with the values right-aligned against 985, which is what
+        # keeps the two rows lined up as the numbers change width
         if mode["saves_highscore"]:
-            ranked = rankedScores()
             screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (720, 250))
-            for i in range(0, 5):
-                screen.blit(space_font.render(str(i + 1) + "   " + formatScoreValue(ranked[i]), True, (224, 185, 9)), (720, 305 + i * 45))
+            for i, (label, value) in enumerate(recordRows()):
+                row_y = 310 + i * 50
+                screen.blit(space_font.render(label, True, (224, 185, 9)), (720, row_y))
+                value_surf = space_font.render(value, True, (224, 185, 9))
+                screen.blit(value_surf, (985 - value_surf.get_width(), row_y))
         prompt = points_font.render("Enter to start, ESC to go back", True, (199, 199, 199))
         screen.blit(prompt, (500 - prompt.get_width() // 2, 550))
         for event in pygame.event.get():
@@ -1138,7 +1159,7 @@ def runGame():
 
 
 def runEndScreen():
-    global scores, trophy, level_index
+    global records, trophy, level_index
 
     # The round is over, so its outcome is fixed - compute it once, not per
     # frame. Reaching the level's point goal is "success" everywhere: Speed
@@ -1179,30 +1200,33 @@ def runEndScreen():
             progress[level_index] = stars
             saveProgress(mode, progress)
 
+    # Records are settled here, once, for the same reason as everything
+    # above: the round is over, so nothing about them changes per frame.
+    # The result is the score for points modes and the elapsed time for time
+    # modes; a "clean" run is one where nobody lost a life, which modes
+    # without lives can never have. new_clean is tracked separately from
+    # new_best so a run can beat the clean record without being the best
+    # result overall - that is the whole point of keeping the second record.
+    new_best = new_clean = False
+    if mode["saves_highscore"]:
+        result_value = players[0].score if mode["score_type"] == "points" \
+            else round(current_time / 1000, 2)
+        clean = mode["lives"] is not None and all(p.lives == mode["lives"] for p in players)
+        new_best = beatsRecord(result_value, records[RECORD_BEST])
+        new_clean = clean and beatsRecord(result_value, records[RECORD_CLEAN])
+        if new_best:
+            records[RECORD_BEST] = result_value
+        if new_clean:
+            records[RECORD_CLEAN] = result_value
+        if new_best or new_clean:
+            saveRecords(level["highscore_file"], records)
+    # Drives the fanfare and the caption below; either record earns it
+    trophy = new_best or new_clean
+
     played_jingle = False
     while True:
         pygame.display.flip()
         screen.fill((0, 0, 0))
-        ranked = rankedScores()
-
-        # Highscores, saved once per round rather than on every frame. The
-        # metric and the direction that counts as "better" both come from
-        # the mode: Speed Run's time is better low, Adventure's score is
-        # better high, so the "worst kept record" sits at opposite ends of
-        # the sorted list (index 4 for time, index 0 for points)
-        if mode["score_type"] == "points":
-            result_value = players[0].score
-            beats_worst = result_value > scores[0]
-        else:
-            result_value = round(current_time / 1000, 2)
-            beats_worst = result_value < scores[4]
-        if mode["saves_highscore"] and not trophy and beats_worst:
-            trophy = True
-            if mode["score_type"] == "points":
-                scores = sorted(scores[1:] + [result_value])
-            else:
-                scores = sorted(scores[:4] + [result_value])
-            saveScores(level["highscore_file"], scores)
 
         if mode["player_count"] == 1:
             # Every row is centred and stacked from a running cursor, using
@@ -1262,17 +1286,21 @@ def runEndScreen():
                 # Icon and caption sit side by side as one row, not stacked -
                 # there isn't vertical room to spare for a second trophy row
                 icon = loadImage("images/001-trophy.png")
-                trophy_surf = space_font.render("New High Score!", True, (224, 185, 9))
+                # Beating only the no-death record says so, rather than
+                # claiming a high score the run didn't actually set
+                caption = "New High Score!" if new_best else "New No-Death Record!"
+                trophy_surf = space_font.render(caption, True, (224, 185, 9))
                 row_width = icon.get_width() + 10 + trophy_surf.get_width()
                 row_x = 500 - row_width // 2
                 screen.blit(icon, (row_x, cursor))
                 screen.blit(trophy_surf, (row_x + icon.get_width() + 10, cursor + (icon.get_height() - trophy_surf.get_height()) // 2))
                 cursor += icon.get_height() + 12
-            # One compact line rather than a label plus a five-row list -
-            # there just isn't room for both alongside everything above
-            scores_surf = space_font.render(compactScoresLine(ranked), True, (224, 185, 9))
-            screen.blit(scores_surf, (500 - scores_surf.get_width() // 2, cursor))
-            cursor += scores_surf.get_height() + 12
+            # Both records on one line - there isn't room for a stacked pair
+            # alongside everything above
+            records_text = "   ".join(label + ": " + value for label, value in recordRows())
+            records_surf = space_font.render(records_text, True, (224, 185, 9))
+            screen.blit(records_surf, (500 - records_surf.get_width() // 2, cursor))
+            cursor += records_surf.get_height() + 12
             controls = "R: Play Again    "
             if reached_goal and has_next:
                 controls += "N: Next Level    "
@@ -1281,8 +1309,11 @@ def runEndScreen():
             screen.blit(controls_surf, (500 - controls_surf.get_width() // 2, cursor))
         else:
             screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (775, 280))
-            for i in range(0, 5):
-                screen.blit(space_font.render(str(i + 1) + "   " + formatScoreValue(ranked[i]), True, (224, 185, 9)), (775, 340 + i * 50))
+            for i, (label, value) in enumerate(recordRows()):
+                row_y = 340 + i * 50
+                screen.blit(space_font.render(label, True, (224, 185, 9)), (775, row_y))
+                value_surf = space_font.render(value, True, (224, 185, 9))
+                screen.blit(value_surf, (985 - value_surf.get_width(), row_y))
             screen.blit(points_font.render("Press R to play again, M for main menu, Q to quit", True, (220, 220, 220)), (10, 550))
             screen.blit(timer_font.render("Time: " + str(round(current_time/1000, 2)), True, (199, 199, 199)), (350, 10))
             screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
