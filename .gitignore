@@ -137,3 +137,7 @@ AdventureProgress.txt
 
 # macOS
 .DS_Store
+
+# Claude Code: the shared project skills are tracked, the per-machine
+# permission allowlist is not
+.claude/settings.local.json

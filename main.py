@@ -663,8 +663,15 @@ class Player:
             sound_events.append("zap")
         elif effect == "deadly":
             # A shield saves the life; otherwise the UFO blows up. The round
-            # ends in runGame() once lives hit 0 and the explosion has played
-            if self.shield:
+            # ends in runGame() once lives hit 0 and the explosion has played.
+            # A UFO already exploding is untouchable: it is mid-death, and the
+            # round is waiting on that animation. Without this, every hazard
+            # touched during those frames took another life - flying into a
+            # cluster of trucks cost three lives at once, and a playtest run
+            # could finish on -4
+            if self.explosion_timer > 0:
+                pass
+            elif self.shield:
                 self.shield = False
                 sound_events.append("shield_break")
             elif self.lives is not None:

@@ -50,6 +50,7 @@ Pygame game in `main.py` (~550 lines) plus `sounds.py` (sound-effect synthesis, 
 
 ## Other files
 
+- `tools/playtest.py` — **the way to check a change actually works.** Plays a level headlessly end to end (`--level N`, `--all`, `--speedrun`, `--invincible`, `--shots DIR`) and reports how the round ended, whether the landmark spawned and cleared, and what landed in the records file; exit status is non-zero if a level never reached its end screen. It runs in a temp copy of the repo, so it never touches real `*Highscore.txt`/`AdventureProgress.txt`. The header comment explains the four patches that make a headless deterministic run possible (dummy SDL driver, fixed-step clock, a `pygame.display.flip` wrapper as the event pump and camera, and a faked key-state array) — read it before writing any other pygame test harness for this repo.
 - `highscoretest.py` — standalone scratch script for the high-score file logic; reads a score from stdin and rewrites `Highscore.txt`. Not imported by the game.
 - `security.py` — unfinished tkinter login prototype, not wired into `main.py`.
 
