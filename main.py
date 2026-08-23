@@ -446,9 +446,53 @@ GERMANY_LEVEL = {
     ],
 }
 
+# Level 6. The deer takes the rare fast 10-point slot and the fox the
+# common 5-point slot; the truck is the lower-half hazard (jet keeps the
+# upper half) until there is Irish vehicle art to swap in.
+IRELAND_LEVEL = {
+    "name": "Level 6 - Ireland",
+    "point_goal": 100,
+    "highscore_file": "IrelandHighscore.txt",
+    "time_limit": 30,
+    "two_star_score": 150,
+    "three_star_score": 175,
+    # The tricolour: green field, orange score, white timer
+    "background_color": (0, 155, 72),
+    "score_color": (255, 121, 0),
+    "timer_color": (255, 255, 255),
+    "flag": "images/ireland.png",
+    "landmark": "images/moher.png",
+    "landmark_name": "the Cliffs of Moher",
+    "animals": {
+        "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
+        "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
+        "images/fox.png": {"effect": "points", "value": 5, "legend": "Fox +5"},
+        "images/deer.png": {"effect": "points", "value": 10, "legend": "Deer +10",
+                            "speed": 10, "recycle_x": 3200},
+        "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+        "images/002-truck.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "y_range": (310, 500)},
+        "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
+    },
+    "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/fox.png",
+                      "images/jet-fighter.png", "images/002-truck.png"],
+    "rare_animal_images": ["images/shield.png", "images/deer.png"],
+    "legend_layout": [
+        ("images/deer.png", (30, 30), (100, 40)),
+        ("images/fox.png", (30, 130), (100, 140)),
+        ("images/squirrel.png", (30, 230), (100, 240)),
+        ("images/hedgehog.png", (30, 330), (100, 340)),
+        ("images/jet-fighter.png", (910, 30), (790, 40)),
+        ("images/002-truck.png", (910, 130), (790, 140)),
+        ("images/shield.png", (340, 400), (420, 410)),
+    ],
+}
+
 # Adventure's world tour, one country per level. More countries append
 # here; continent chapters will group lists like this one.
-ADVENTURE_LEVELS = [UK_LEVEL, FRANCE_LEVEL, ITALY_LEVEL, SPAIN_LEVEL, GERMANY_LEVEL]
+ADVENTURE_LEVELS = [UK_LEVEL, FRANCE_LEVEL, ITALY_LEVEL, SPAIN_LEVEL, GERMANY_LEVEL,
+                    IRELAND_LEVEL]
 
 # A mode is one rules configuration for a round: how many players, which
 # levels, and whether the round's time counts for the high scores. The mode
