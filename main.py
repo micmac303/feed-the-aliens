@@ -1304,7 +1304,7 @@ def runEndScreen():
             controls = "R: Play Again    "
             if reached_goal and has_next:
                 controls += "N: Next Level    "
-            controls += "M: Menu    Q: Quit"
+            controls += "M: Menu"
             controls_surf = points_font.render(controls, True, (220, 220, 220))
             screen.blit(controls_surf, (500 - controls_surf.get_width() // 2, cursor))
         else:
@@ -1314,7 +1314,7 @@ def runEndScreen():
                 screen.blit(space_font.render(label, True, (224, 185, 9)), (775, row_y))
                 value_surf = space_font.render(value, True, (224, 185, 9))
                 screen.blit(value_surf, (985 - value_surf.get_width(), row_y))
-            screen.blit(points_font.render("Press R to play again, M for main menu, Q to quit", True, (220, 220, 220)), (10, 550))
+            screen.blit(points_font.render("Press R to play again, M for main menu", True, (220, 220, 220)), (10, 550))
             screen.blit(timer_font.render("Time: " + str(round(current_time/1000, 2)), True, (199, 199, 199)), (350, 10))
             screen.blit(title_font.render("GAME OVER!", True, (199, 199, 199)), (270, 230))
             for p, corner in zip(players, ((30, 30), (880, 30))):
@@ -1371,8 +1371,6 @@ def runEndScreen():
                 if event.key == pygame.K_m:
                     sounds.play("menu_select")
                     return "start"
-                if event.key == pygame.K_q:
-                    return "quit"
 
 
 newRound()
