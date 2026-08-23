@@ -403,9 +403,52 @@ SPAIN_LEVEL = {
     ],
 }
 
-# Adventure's world tour, one country per level. Germany and friends
-# append here; continent chapters will group lists like this one.
-ADVENTURE_LEVELS = [UK_LEVEL, FRANCE_LEVEL, ITALY_LEVEL, SPAIN_LEVEL]
+# Level 5. The alsatian takes the rare fast 10-point slot and the boar the
+# common 5-point slot; the truck is the lower-half hazard (jet keeps the
+# upper half).
+GERMANY_LEVEL = {
+    "name": "Level 5 - Germany",
+    "point_goal": 100,
+    "highscore_file": "GermanyHighscore.txt",
+    "time_limit": 30,
+    "two_star_score": 150,
+    "three_star_score": 175,
+    # The flag's three colours: gold field, red score, black timer
+    "background_color": (255, 206, 0),
+    "score_color": (221, 0, 0),
+    "timer_color": (0, 0, 0),
+    "flag": "images/germany.png",
+    "landmark": "images/brandenburg-gate.png",
+    "landmark_name": "the Brandenburg Gate",
+    "animals": {
+        "images/hedgehog.png": {"effect": "points", "value": 1, "legend": "Hedgehog +1"},
+        "images/squirrel.png": {"effect": "points", "value": 2, "legend": "Squirrel +2"},
+        "images/boar.png": {"effect": "points", "value": 5, "legend": "Boar +5"},
+        "images/alsatian.png": {"effect": "points", "value": 10, "legend": "Alsatian +10",
+                            "speed": 10, "recycle_x": 3200},
+        "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+        "images/002-truck.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "y_range": (310, 500)},
+        "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
+    },
+    "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/boar.png",
+                      "images/jet-fighter.png", "images/002-truck.png"],
+    "rare_animal_images": ["images/shield.png", "images/alsatian.png"],
+    "legend_layout": [
+        ("images/alsatian.png", (30, 30), (100, 40)),
+        ("images/boar.png", (30, 130), (100, 140)),
+        ("images/squirrel.png", (30, 230), (100, 240)),
+        ("images/hedgehog.png", (30, 330), (100, 340)),
+        ("images/jet-fighter.png", (910, 30), (790, 40)),
+        ("images/002-truck.png", (910, 130), (790, 140)),
+        ("images/shield.png", (340, 400), (420, 410)),
+    ],
+}
+
+# Adventure's world tour, one country per level. More countries append
+# here; continent chapters will group lists like this one.
+ADVENTURE_LEVELS = [UK_LEVEL, FRANCE_LEVEL, ITALY_LEVEL, SPAIN_LEVEL, GERMANY_LEVEL]
 
 # A mode is one rules configuration for a round: how many players, which
 # levels, and whether the round's time counts for the high scores. The mode
@@ -822,13 +865,17 @@ def runLevelSelect():
     unlocked = [i == 0 or progress[i - 1] > 0 for i in range(len(mode["levels"]))]
     selected = level_index if unlocked[min(level_index, len(unlocked) - 1)] else 0
     star_img = pygame.transform.smoothscale(loadImage("images/001-star.png"), (28, 28))
+    # Rows run from y=250 to the last one at y=520, at the classic 90px
+    # spacing while that fits and tightening as more countries are added -
+    # a fixed 90 walked the fifth level off the bottom of the screen
+    row_gap = min(90, (520 - 250) // max(len(mode["levels"]) - 1, 1))
     while True:
         pygame.display.flip()
         screen.fill((0, 0, 0))
         heading = title_font.render("Choose a level", True, (199, 199, 199))
         screen.blit(heading, (500 - heading.get_width() // 2, 60))
         for i, lvl in enumerate(mode["levels"]):
-            row_y = 250 + i * 90
+            row_y = 250 + i * row_gap
             if not unlocked[i]:
                 color = (70, 70, 70)
             elif i == selected:
