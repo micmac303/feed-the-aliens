@@ -33,7 +33,7 @@ Asset conventions, worth checking with `pygame.image.load(...).get_size()`:
 |---|---|---|
 | Animal sprite | 64×64 | flat-icon style, faces right |
 | Flag | 32×32 | shown by the level name, the timer and the level-select row |
-| Landmark | 512×512 | halved at runtime, sits bottom-left |
+| Landmark | any, ~512 tall | halved at runtime, sits bottom-left. **Crop it to the silhouette** — the whole image box is solid, so transparent padding is invisible death |
 
 ## 2. Write the level dict
 
