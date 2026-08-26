@@ -129,6 +129,18 @@ def saveProgress(mode, stars):
         progress_file.write(" ".join(str(s) for s in stars))
 
 
+# Which levels the player is allowed to pick. An ordinary level opens as
+# soon as the one before it has a star. A level carrying "bonus_stars" is a
+# hidden bonus round instead: it stays locked until *every* level before it
+# has at least that many stars, and the level select refuses to name it
+# until then. Ireland is the first one, at two stars a level.
+def levelUnlocked(index, levels, progress):
+    required = levels[index].get("bonus_stars")
+    if required:
+        return all(s >= required for s in progress[:index])
+    return index == 0 or progress[index - 1] > 0
+
+
 # Images are loaded from disk once and reused. The level-info screen
 # redraws ten legend images every frame, and every animal spawn needs a
 # surface.
@@ -451,6 +463,9 @@ GERMANY_LEVEL = {
 # upper half) until there is Irish vehicle art to swap in.
 IRELAND_LEVEL = {
     "name": "Level 6 - Ireland",
+    # A hidden bonus round: locked, and shown only as "Bonus Level", until
+    # every country before it has been cleared with two stars or better
+    "bonus_stars": 2,
     "point_goal": 100,
     "highscore_file": "IrelandHighscore.txt",
     "time_limit": 30,
@@ -913,7 +928,8 @@ def runLevelSelect():
     global level_index
 
     progress = loadProgress(mode)
-    unlocked = [i == 0 or progress[i - 1] > 0 for i in range(len(mode["levels"]))]
+    unlocked = [levelUnlocked(i, mode["levels"], progress)
+                for i in range(len(mode["levels"]))]
     selected = level_index if unlocked[min(level_index, len(unlocked) - 1)] else 0
     star_img = pygame.transform.smoothscale(loadImage("images/001-star.png"), (28, 28))
     # Rows run from y=250 to the last one at y=520, at the classic 90px
@@ -933,13 +949,22 @@ def runLevelSelect():
                 color = (224, 185, 9)
             else:
                 color = (120, 120, 120)
-            if lvl.get("flag"):
+            # A locked bonus level gives nothing away: no flag, no country,
+            # just a question mark and the words "Bonus Level"
+            hidden = bool(lvl.get("bonus_stars")) and not unlocked[i]
+            if hidden:
+                mark = space_font.render("?", True, color)
+                screen.blit(mark, (306 - mark.get_width() // 2, row_y))
+            elif lvl.get("flag"):
                 flag = loadImage(lvl["flag"])
                 if not unlocked[i]:
                     flag = flag.copy()
                     flag.set_alpha(60)
                 screen.blit(flag, (290, row_y + 8))
-            name = lvl["name"] + ("" if unlocked[i] else "  -  LOCKED")
+            if hidden:
+                name = "Bonus Level"
+            else:
+                name = lvl["name"] + ("" if unlocked[i] else "  -  LOCKED")
             name_surf = space_font.render(("> " if i == selected else "   ") + name, True, color)
             screen.blit(name_surf, (330, row_y))
             # Earned stars follow the name, however long it is
@@ -1272,9 +1297,6 @@ def runEndScreen():
         p.score >= level["point_goal"] and (p.lives is None or p.lives > 0)
         for p in players
     )
-    next_index = level_index + 1
-    has_next = next_index < len(mode["levels"])
-
     # Star rating: 1 for reaching the goal, 2 for reaching two_star_score,
     # 3 for reaching three_star_score without losing a life. two_star_score
     # defaults to double the goal so a level that doesn't set it still gets
@@ -1292,11 +1314,18 @@ def runEndScreen():
 
     # A better rating than the stored one is remembered forever - one star
     # is what unlocks the next level on the level select screen
-    if mode.get("progress_file") and stars > 0:
-        progress = loadProgress(mode)
-        if stars > progress[level_index]:
-            progress[level_index] = stars
-            saveProgress(mode, progress)
+    progress = loadProgress(mode)
+    if mode.get("progress_file") and stars > progress[level_index]:
+        progress[level_index] = stars
+        saveProgress(mode, progress)
+
+    # Whether there is somewhere to go next - read from the progress this
+    # round just wrote, so finishing the run that completes a bonus level's
+    # requirement reveals it immediately. A *locked* bonus level is not a
+    # next level: it must not be named here, and N must not walk into it
+    next_index = level_index + 1
+    has_next = (next_index < len(mode["levels"])
+                and levelUnlocked(next_index, mode["levels"], progress))
 
     # Records are settled here, once, for the same reason as everything
     # above: the round is over, so nothing about them changes per frame.

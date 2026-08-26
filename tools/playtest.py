@@ -4,6 +4,10 @@
     python tools/playtest.py --level 5 --shots out  # and save a PNG per screen
     python tools/playtest.py --all                  # every Adventure level
     python tools/playtest.py --speedrun             # the two-player mode
+    python tools/playtest.py --level 6 --progress "1 1 1 1 1 0"
+                                                    # prove a lock holds
+    python tools/playtest.py --stop-at levels --progress "2 2 2 2 2 0"
+                                                    # photograph a menu only
 
 Reading a diff cannot tell you whether a new level's landmark actually
 spawns, whether its rows still fit on the level-select screen, or whether
@@ -31,8 +35,14 @@ How it works, and why it works this way:
     playtest never touches your real `*Highscore.txt` or
     `AdventureProgress.txt`.
 
-Exit status is 0 when every requested level reached its end screen, 1
-otherwise, so this is usable as a pre-commit check.
+By default every level is starred so any can be picked; --progress sets an
+exact campaign save instead, which is how gated content gets tested. A run
+whose level the select refuses reports LOCKED rather than playing something
+else, so "this should not be reachable yet" is a checkable claim.
+
+Exit status is 0 when every requested level reached its end screen (or was
+cleanly refused as locked), 1 otherwise, so this is usable as a pre-commit
+check.
 """
 
 import argparse
@@ -83,7 +93,8 @@ class Playtest:
     """One run of one level, driven to its end screen."""
 
     def __init__(self, level_index=0, mode_index=1, shots_dir=None,
-                 seed=1234, invincible=False, max_flips=12000, unlock=True):
+                 seed=1234, invincible=False, max_flips=12000, unlock=True,
+                 progress=None, stop_at=None):
         self.level_index = level_index      # 0-based, into mode["levels"]
         self.mode_index = mode_index        # 0-based, into MODES
         self.shots_dir = shots_dir
@@ -91,6 +102,10 @@ class Playtest:
         self.invincible = invincible        # pin lives, to reach the clock
         self.max_flips = max_flips
         self.unlock = unlock                # pre-star the campaign
+        self.progress = progress            # explicit star counts instead
+        self.stop_at = stop_at              # quit once this screen is shown
+        self.stopped_at = None
+        self.refused = None                 # level name the select refused
         self.g = {}                         # main.py's globals, after exec
         self.flips = 0
         self.menu_keys_sent = 0
@@ -146,9 +161,15 @@ class Playtest:
             if self.menu_keys_sent < self.level_index:
                 self.press(pygame.K_DOWN)
                 self.menu_keys_sent += 1
+            elif self.menu_keys_sent == self.level_index:
+                self.press(pygame.K_RETURN)      # exactly one confirm
+                self.menu_keys_sent += 1
             else:
-                self.press(pygame.K_RETURN)
-                self.menu_keys_sent = 0
+                # Confirming would have left this screen on the very next
+                # frame. Still here means the row refused: it is locked, or
+                # it is a bonus level whose stars have not been earned
+                self.refused = self.g["mode"]["levels"][self.level_index]["name"]
+                self.reached_end = True
         elif screen_name == "instructions":
             # The menu opens on Start Level. Detour through Level Info first,
             # so a playtest sees the legend and records for the level it is
@@ -259,6 +280,12 @@ class Playtest:
                              screen_name))
         if screen_name == "info":
             self.seen_info = True
+        # Stopping at a menu is a successful run in its own right: it is how
+        # a locked or hidden level gets inspected without playing anything
+        if screen_name == self.stop_at and seen >= 2:
+            self.stopped_at = screen_name
+            self.reached_end = True
+            return
 
         if screen_name == "game":
             if self.landmark_seen_at is None and self.g.get("landmark"):
@@ -300,7 +327,12 @@ class Playtest:
         # main.py does `import sounds`, and the copy is what should be found
         if workdir not in sys.path:
             sys.path.insert(0, workdir)
-        if self.unlock:
+        if self.progress is not None:
+            # An exact campaign state, for testing what is locked and what
+            # a partly-starred save can reach
+            with open("AdventureProgress.txt", "w") as f:
+                f.write(self.progress + "\n")
+        elif self.unlock:
             # Star every level so the level select lets us pick any of them
             with open("AdventureProgress.txt", "w") as f:
                 f.write(" ".join(["3"] * 30) + "\n")
@@ -353,6 +385,8 @@ class Playtest:
         return {
             "level": level.get("name") or "Speed Run",
             "reached_end": self.reached_end,
+            "stopped_at": self.stopped_at,
+            "refused": self.refused,
             "ended_by": ended_by,
             "flips": self.flips,
             "score": [p.score for p in players],
@@ -370,6 +404,12 @@ class Playtest:
 def describe(result):
     ok = result["reached_end"]
     lines = ["%s  %s" % ("PASS" if ok else "FAIL", result["level"])]
+    if result.get("refused"):
+        return ("LOCKED  %s\n    the level select refused to enter it - "
+                "not unlocked by this campaign save" % result["refused"])
+    if result.get("stopped_at"):
+        lines.append("    stopped at the %s screen as asked" % result["stopped_at"])
+        return "\n".join(lines)
     lines.append("    score %s   lives %s   elapsed %ss/%s   ended: %s"
                  % (result["score"], result["lives"], result["elapsed"],
                     result["time_limit"], result["ended_by"]))
@@ -408,6 +448,13 @@ def main(argv=None):
     parser.add_argument("--invincible", action="store_true",
                         help="pin lives, so the clock (and the landmark) is "
                              "what ends the round")
+    parser.add_argument("--progress", metavar="STARS",
+                        help="exact campaign save to start from, e.g. "
+                             "\"2 2 2 2 2 0\" - by default every level is "
+                             "starred so any of them can be picked")
+    parser.add_argument("--stop-at", metavar="SCREEN", dest="stop_at",
+                        choices=("start", "levels", "instructions", "info"),
+                        help="screenshot this menu and quit, without playing")
     parser.add_argument("--keep", action="store_true",
                         help="keep the temp copy of the repo and print its path")
     args = parser.parse_args(argv)
@@ -440,7 +487,8 @@ def main(argv=None):
             pygame.event.clear()
         test = Playtest(level_index=index, mode_index=mode_index,
                         shots_dir=shots, seed=args.seed,
-                        invincible=args.invincible)
+                        invincible=args.invincible, progress=args.progress,
+                        stop_at=args.stop_at)
         result = test.run(workdir)
         results.append(result)
         print(describe(result))
