@@ -1263,7 +1263,7 @@ def runGame():
         for animal in animals:
             animal.draw(screen)
         if paused:
-            banner = space_font.render("PAUSED - press P to resume, ESC for main menu", True, (199, 199, 199))
+            banner = space_font.render("PAUSED - P to resume, R to restart, ESC for main menu", True, (199, 199, 199))
             screen.blit(banner, (500 - banner.get_width() // 2, 280))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -1274,6 +1274,15 @@ def runGame():
                 if event.key == pygame.K_p:
                     paused = not paused
                     sounds.play("menu_move")
+                # R restarts the level then and there - no end screen, no
+                # instructions, straight back into a fresh round. Returning
+                # "game" hands back to the dispatch loop, which calls this
+                # function again from the top
+                if event.key == pygame.K_r and paused:
+                    sounds.play("menu_select")
+                    sounds.stop_hum()
+                    newRound()
+                    return "game"
                 # ESC returns to the main menu, but only from the pause
                 # screen so a stray keypress mid-game cannot end the round
                 if event.key == pygame.K_ESCAPE and paused:
@@ -1479,13 +1488,13 @@ def runEndScreen():
             if event.type == pygame.QUIT:
                 return "quit"
             if event.type == pygame.KEYDOWN:
-                # R jumps straight back to the level's instructions screen -
-                # same mode, same level, fresh round - skipping the start
-                # screen entirely
+                # R replays immediately: same mode, same level, fresh round,
+                # straight back into the action with no menu in between -
+                # the point of a retry is to be playing again at once
                 if event.key == pygame.K_r:
                     sounds.play("menu_select")
                     newRound()
-                    return "instructions"
+                    return "game"
                 # N advances the campaign - only live when the goal was
                 # actually reached and there is somewhere further to go
                 if event.key == pygame.K_n and reached_goal and has_next:
