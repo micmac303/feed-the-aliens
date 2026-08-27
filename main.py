@@ -129,12 +129,46 @@ def saveProgress(mode, stars):
         progress_file.write(" ".join(str(s) for s in stars))
 
 
-# Which levels the player is allowed to pick. An ordinary level opens as
-# soon as the one before it has a star. A level carrying "bonus_stars" is a
-# hidden bonus round instead: it stays locked until *every* level before it
-# has at least that many stars, and the level select refuses to name it
-# until then. Ireland is the first one, at two stars a level.
-def levelUnlocked(index, levels, progress):
+# Bonus fish are the other kind of campaign progress: a single running
+# total, not a per-level thing, because a fish found in Spain counts the
+# same as one found in Poland. Same treatment as the star file - player
+# data, gitignored, and a missing or corrupt one just means "none yet"
+def loadFish(mode):
+    if not mode.get("bonus_fish_file"):
+        return 0
+    try:
+        with open(mode["bonus_fish_file"], "r") as fish_file:
+            return max(int(fish_file.read().split()[0]), 0)
+    except (OSError, ValueError, IndexError):
+        return 0
+
+
+def saveFish(mode, found):
+    with open(mode["bonus_fish_file"], "w") as fish_file:
+        fish_file.write(str(found))
+
+
+# How many fish the campaign's fish-gated level wants, or 0 if it has none.
+# Read from the level table rather than hardcoded, so the requirement lives
+# next to the level that imposes it
+def fishGoal(mode):
+    for lvl in mode["levels"]:
+        if lvl.get("bonus_fish"):
+            return lvl["bonus_fish"]
+    return 0
+
+
+# Which levels the player is allowed to pick, and there are three rules.
+# An ordinary level opens as soon as the one before it has a star. A level
+# carrying "bonus_stars" is a hidden bonus round: locked until *every*
+# level before it has at least that many stars (Ireland at two, Poland at
+# three). A level carrying "bonus_fish" ignores stars altogether and wants
+# that many bonus fish, collected wherever they happened to turn up. In all
+# three cases the level select refuses to name a locked one.
+def levelUnlocked(index, levels, progress, fish=0):
+    required_fish = levels[index].get("bonus_fish")
+    if required_fish:
+        return fish >= required_fish
     required = levels[index].get("bonus_stars")
     if required:
         return all(s >= required for s in progress[:index])
@@ -167,6 +201,10 @@ animals = []
 landmark = None
 landmark_cleared = False
 landmark_crashed = False
+
+# Bonus fish picked up this round. The sim counts, runEndScreen() banks it
+# into the campaign total - the same split as the records and the stars
+fish_found = 0
 
 # Sound events the sim emits, one name per thing that happened ("collect",
 # "explosion", ...). The sim only ever appends names here - it never touches
@@ -551,10 +589,70 @@ POLAND_LEVEL = {
     ],
 }
 
+# Level 8, and the one bonus level stars cannot buy: it opens only once
+# three bonus fish have been found in the countries above. Not a country,
+# so no flag - a whole sea instead, and the only level where a fish is
+# just a fish worth a point.
+MEDITERRANEAN_LEVEL = {
+    "name": "Level 8 - Mediterranean Sea",
+    # Unlocked by fish rather than stars - see levelUnlocked()
+    "bonus_fish": 3,
+    "point_goal": 100,
+    "highscore_file": "MediterraneanHighscore.txt",
+    "time_limit": 30,
+    "two_star_score": 150,
+    "three_star_score": 175,
+    # Deep water, with the score in white and the timer in shallow-sea aqua
+    "background_color": (16, 56, 104),
+    "score_color": (255, 255, 255),
+    "timer_color": (126, 217, 232),
+    "landmark": "images/coral.png",
+    "landmark_name": "the coral reef",
+    "animals": {
+        "images/fish.png": {"effect": "points", "value": 1, "legend": "Fish +1"},
+        "images/shark.png": {"effect": "points", "value": 2, "legend": "Shark +2"},
+        "images/turtle.png": {"effect": "points", "value": 5, "legend": "Turtle +5"},
+        "images/octopus.png": {"effect": "points", "value": 10, "legend": "Octopus +10",
+                            "speed": 10, "recycle_x": 3200},
+        "images/battleship.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+        "images/submarine.png": {"effect": "deadly", "value": None, "legend": "-1 life",
+                           "y_range": (310, 500)},
+        "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
+    },
+    "animal_images": ["images/fish.png", "images/shark.png", "images/turtle.png",
+                      "images/battleship.png", "images/submarine.png"],
+    "rare_animal_images": ["images/shield.png", "images/octopus.png"],
+    "legend_layout": [
+        ("images/octopus.png", (30, 30), (100, 40)),
+        ("images/turtle.png", (30, 130), (100, 140)),
+        ("images/shark.png", (30, 230), (100, 240)),
+        ("images/fish.png", (30, 330), (100, 340)),
+        ("images/battleship.png", (910, 30), (790, 40)),
+        ("images/submarine.png", (910, 130), (790, 140)),
+        ("images/shield.png", (340, 400), (420, 410)),
+    ],
+}
+
 # Adventure's world tour, one country per level. More countries append
 # here; continent chapters will group lists like this one.
 ADVENTURE_LEVELS = [UK_LEVEL, FRANCE_LEVEL, ITALY_LEVEL, SPAIN_LEVEL, GERMANY_LEVEL,
-                    IRELAND_LEVEL, POLAND_LEVEL]
+                    IRELAND_LEVEL, POLAND_LEVEL, MEDITERRANEAN_LEVEL]
+
+# The bonus fish. It is not in any level's spawn pools - newRound() puts a
+# single one on the field by hand, in a minority of rounds - but it has to
+# mean something everywhere it can turn up, so every level that has not
+# already claimed the image gets an entry. The Mediterranean has: down
+# there a fish is ordinary food, which is why it is skipped here and why
+# no fish are ever seeded in the level they unlock.
+BONUS_FISH_IMAGE = "images/fish.png"
+for _level in ADVENTURE_LEVELS:
+    _level["animals"].setdefault(BONUS_FISH_IMAGE,
+                                 {"effect": "bonus", "value": 5,
+                                  "legend": "Bonus fish!"})
+# Roughly this many rounds in one turn up a fish - "rarely" is the whole
+# point, so a player who finds one has actually found something
+FISH_ROUND_ODDS = 4
 
 # A mode is one rules configuration for a round: how many players, which
 # levels, and whether the round's time counts for the high scores. The mode
@@ -573,6 +671,7 @@ MODES = [
      "lives": None,
      # One level and no campaign, so nothing to remember between sessions
      "progress_file": None,
+     "bonus_fish_file": None,
      "levels": [CLASSIC_LEVEL]},
     {"name": "Adventure",
      "tagline": "One player - eat your way around the world",
@@ -585,6 +684,8 @@ MODES = [
      "lives": 3,
      # Star ratings per level (0-3); a starred level unlocks the next one
      "progress_file": "AdventureProgress.txt",
+     # Running total of bonus fish found, across every level
+     "bonus_fish_file": "FishFound.txt",
      "levels": ADVENTURE_LEVELS},
 ]
 mode = MODES[0]
@@ -606,8 +707,15 @@ for m in MODES:
 # when collected stays in the level's animals table - the object only carries
 # movement state and its type tag.
 class Animal:
-    def __init__(self, slot=0, start_offset=1000):
-        if rng.randint(1, 8) == 8:
+    def __init__(self, slot=0, start_offset=1000, image_name=None):
+        # image_name forces the type instead of rolling for it - how the
+        # bonus fish gets onto a field whose spawn pools have never heard
+        # of it. It skips the rolls below, so a forced animal shifts the
+        # rng stream: seeded rounds replay exactly, but only against a run
+        # that made the same fish decision
+        if image_name is not None:
+            self.image_name = image_name
+        elif rng.randint(1, 8) == 8:
             self.image_name = level["rare_animal_images"][rng.randint(0, len(level["rare_animal_images"]) - 1)]
         else:
             self.image_name = level["animal_images"][rng.randint(0, len(level["animal_images"]) - 1)]
@@ -784,6 +892,14 @@ class Player:
                 self.lives -= 1
                 self.explosion_timer = 50
                 sound_events.append("explosion")
+        elif effect == "bonus":
+            # A find, not a score: the fanfare plays, and runEndScreen()
+            # banks it into the campaign's running total when the round is
+            # over. Points come too, so it is never a wasted pickup
+            global fish_found
+            fish_found += 1
+            self.score += value
+            sound_events.append("trophy")
         elif effect == "shield":
             self.shield = True
             sound_events.append("shield_up")
@@ -852,6 +968,7 @@ def newRound(seed=None):
     global records, trophy, chosen_color
     global current_time, last_time
     global landmark, landmark_cleared, landmark_crashed
+    global fish_found
 
     # Every roll the sim makes (spawns, gift coin flips, background colour)
     # comes from this generator. Pass a seed to replay a round exactly - the
@@ -897,6 +1014,18 @@ def newRound(seed=None):
     animals.clear()
     for i in range(0, 27):
         animals.append(Animal(slot=i, start_offset=250))
+
+    # A minority of rounds hide a single bonus fish in the field, taking an
+    # ordinary animal's place so the round is no busier than usual. Never
+    # in the level the fish unlock, and never once enough have been found -
+    # at that point the hunt is over and it would just be a stray fish
+    fish_found = 0
+    if (mode.get("bonus_fish_file") and not level.get("bonus_fish")
+            and loadFish(mode) < fishGoal(mode)
+            and rng.randint(1, FISH_ROUND_ODDS) == 1):
+        slot = rng.randint(0, len(animals) - 1)
+        animals[slot] = Animal(slot=slot, start_offset=250,
+                               image_name=BONUS_FISH_IMAGE)
 
     landmark = None
     landmark_cleared = False
@@ -975,21 +1104,28 @@ def runLevelSelect():
     global level_index
 
     progress = loadProgress(mode)
-    unlocked = [levelUnlocked(i, mode["levels"], progress)
+    fish = loadFish(mode)
+    unlocked = [levelUnlocked(i, mode["levels"], progress, fish)
                 for i in range(len(mode["levels"]))]
     selected = level_index if unlocked[min(level_index, len(unlocked) - 1)] else 0
     star_img = pygame.transform.smoothscale(loadImage("images/001-star.png"), (28, 28))
+    fish_img = pygame.transform.smoothscale(loadImage(BONUS_FISH_IMAGE), (28, 28))
+    fish_dim = fish_img.copy()
+    fish_dim.set_alpha(70)
     # The rows are fitted to the band below the heading rather than placed
     # at fixed offsets: the classic 90px spacing while that fits, tightening
-    # as countries are added, and the whole block centred in what is left.
-    # A fixed 90 walked the fifth level off the bottom of the screen; the
-    # tightening version then ran the seventh into the sixth, because it
-    # ignored how tall a row actually is. Past about eight levels even this
-    # runs out and the screen needs a smaller row font or paging
+    # as levels are added, dropping to a smaller row font when even that
+    # will not fit, and the whole block centred in what is left. A fixed 90
+    # walked the fifth level off the bottom of the screen; the tightening
+    # version then ran the seventh into the sixth, because it ignored how
+    # tall a row actually is. Past a dozen or so the screen needs paging
     BAND_TOP, BAND_BOTTOM = 190, 560
-    row_height = space_font.get_height()
     row_count = len(mode["levels"])
-    row_gap = min(90, (BAND_BOTTOM - BAND_TOP - row_height) // max(row_count - 1, 1))
+    for row_font in (space_font, points_font):
+        row_height = row_font.get_height()
+        row_gap = min(90, (BAND_BOTTOM - BAND_TOP - row_height) // max(row_count - 1, 1))
+        if row_gap >= row_height:
+            break
     block_height = row_gap * (row_count - 1) + row_height
     rows_top = BAND_TOP + (BAND_BOTTOM - BAND_TOP - block_height) // 2
     while True:
@@ -1007,25 +1143,36 @@ def runLevelSelect():
                 color = (120, 120, 120)
             # A locked bonus level gives nothing away: no flag, no country,
             # just a question mark and the words "Bonus Level"
-            hidden = bool(lvl.get("bonus_stars")) and not unlocked[i]
+            hidden = bool(lvl.get("bonus_stars") or lvl.get("bonus_fish")) and not unlocked[i]
+            icon_y = row_y + (row_height - 32) // 2
             if hidden:
-                mark = space_font.render("?", True, color)
+                mark = row_font.render("?", True, color)
                 screen.blit(mark, (306 - mark.get_width() // 2, row_y))
             elif lvl.get("flag"):
                 flag = loadImage(lvl["flag"])
                 if not unlocked[i]:
                     flag = flag.copy()
                     flag.set_alpha(60)
-                screen.blit(flag, (290, row_y + 8))
+                screen.blit(flag, (290, icon_y))
             if hidden:
                 name = "Bonus Level"
             else:
                 name = lvl["name"] + ("" if unlocked[i] else "  -  LOCKED")
-            name_surf = space_font.render(("> " if i == selected else "   ") + name, True, color)
+            name_surf = row_font.render(("> " if i == selected else "   ") + name, True, color)
             screen.blit(name_surf, (330, row_y))
-            # Earned stars follow the name, however long it is
-            for s in range(progress[i]):
-                screen.blit(star_img, (330 + name_surf.get_width() + 24 + s * 34, row_y + 8))
+            # Earned stars follow the name, however long it is. A fish-gated
+            # level shows fish instead, but only once the player has found
+            # one: before that the row is a total mystery, and after it the
+            # hunt has a visible target
+            trail_x = 330 + name_surf.get_width() + 24
+            trail_y = row_y + (row_height - 28) // 2
+            if lvl.get("bonus_fish") and fish:
+                for f in range(lvl["bonus_fish"]):
+                    icon = fish_img if f < fish else fish_dim
+                    screen.blit(icon, (trail_x + f * 34, trail_y))
+            else:
+                for star in range(progress[i]):
+                    screen.blit(star_img, (trail_x + star * 34, trail_y))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit"
@@ -1388,9 +1535,17 @@ def runEndScreen():
     # round just wrote, so finishing the run that completes a bonus level's
     # requirement reveals it immediately. A *locked* bonus level is not a
     # next level: it must not be named here, and N must not walk into it
+    # Bonus fish found this round are banked now, before has_next is
+    # decided, so the round that lands the third one reveals the level it
+    # unlocks on this very screen
+    fish_total = loadFish(mode)
+    if fish_found and mode.get("bonus_fish_file"):
+        fish_total += fish_found
+        saveFish(mode, fish_total)
+
     next_index = level_index + 1
     has_next = (next_index < len(mode["levels"])
-                and levelUnlocked(next_index, mode["levels"], progress))
+                and levelUnlocked(next_index, mode["levels"], progress, fish_total))
 
     # Records are settled here, once, for the same reason as everything
     # above: the round is over, so nothing about them changes per frame.
@@ -1421,16 +1576,18 @@ def runEndScreen():
         screen.fill((0, 0, 0))
 
         if mode["player_count"] == 1:
-            # Every row is centred and stacked from a running cursor, using
-            # each surface's real rendered height rather than a guessed
-            # constant (impact's glyphs run much taller than their point
-            # size suggests) - so an optional row (the failure reason, the
-            # trophy) can't leave the rows below it overlapping
-            cursor = 15
+            # Every row is built first and laid out second. Each one uses
+            # its real rendered height, never a guessed constant (impact's
+            # glyphs run much taller than their point size suggests), and
+            # the gaps between them are squeezed to fit whatever room is
+            # left. Stacking straight down a running cursor was not enough:
+            # with a star row, a bonus fish, a trophy and a next level all
+            # showing at once the column ran 98px past the bottom of the
+            # screen and simply lost its last row
+            rows = []                       # (surface, gap below it)
             banner_color = (224, 185, 9) if reached_goal else (207, 41, 41)
-            banner = title_font.render("SUCCESS!" if reached_goal else "FAILED", True, banner_color)
-            screen.blit(banner, (500 - banner.get_width() // 2, cursor))
-            cursor += banner.get_height() + 8
+            rows.append((title_font.render("SUCCESS!" if reached_goal else "FAILED",
+                                           True, banner_color), 8))
             # A failure needs a reason; a success is self-explanatory from
             # the score alone, so it gets no subtitle
             if not reached_goal:
@@ -1440,24 +1597,28 @@ def runEndScreen():
                     reason = "Out of lives!"
                 else:
                     reason = "Time's up!"
-                sub = points_font.render(reason, True, (199, 199, 199))
-                screen.blit(sub, (500 - sub.get_width() // 2, cursor))
-                cursor += sub.get_height() + 10
+                rows.append((points_font.render(reason, True, (199, 199, 199)), 10))
             # The score is the headline: big, centred, in the player's colour
-            score_surf = score_font.render(str(players[0].score),
-                                           True, level.get("score_color", players[0].score_color))
-            screen.blit(score_surf, (500 - score_surf.get_width() // 2, cursor))
-            cursor += score_surf.get_height() + 10
+            rows.append((score_font.render(str(players[0].score), True,
+                                           level.get("score_color", players[0].score_color)), 10))
             # The star rating: earned stars bright, the rest ghosted, so
             # the player can see what was left on the table
             if stars > 0:
                 star_full = pygame.transform.smoothscale(loadImage("images/001-star.png"), (44, 44))
                 star_dim = star_full.copy()
                 star_dim.set_alpha(50)
-                row_x = 500 - (3 * 44 + 2 * 14) // 2
-                for s in range(3):
-                    screen.blit(star_full if s < stars else star_dim, (row_x + s * 58, cursor))
-                cursor += 44 + 12
+                star_row = pygame.Surface((3 * 58 - 14, 44), pygame.SRCALPHA)
+                for star in range(3):
+                    star_row.blit(star_full if star < stars else star_dim, (star * 58, 0))
+                rows.append((star_row, 12))
+            # A find worth announcing: the fish is rare, easy to miss in
+            # the scramble, and means nothing to the player until someone
+            # says so
+            if fish_found:
+                goal = fishGoal(mode)
+                caught = ("Bonus fish found!  %d of %d" % (min(fish_total, goal), goal)
+                          if goal else "Bonus fish found!")
+                rows.append((space_font.render(caught, True, (126, 217, 232)), 12))
             # The next-country line is always shown - what changes is
             # whether it names an unlocked destination or one still to earn
             if has_next:
@@ -1471,9 +1632,7 @@ def runEndScreen():
             else:
                 next_text = "More countries coming soon!"
                 next_color = (224, 185, 9) if reached_goal else (150, 150, 150)
-            next_surf = space_font.render(next_text, True, next_color)
-            screen.blit(next_surf, (500 - next_surf.get_width() // 2, cursor))
-            cursor += next_surf.get_height() + 15
+            rows.append((space_font.render(next_text, True, next_color), 15))
             if trophy:
                 # Icon and caption sit side by side as one row, not stacked -
                 # there isn't vertical room to spare for a second trophy row
@@ -1482,23 +1641,34 @@ def runEndScreen():
                 # claiming a high score the run didn't actually set
                 caption = "New High Score!" if new_best else "New No-Death Record!"
                 trophy_surf = space_font.render(caption, True, (224, 185, 9))
-                row_width = icon.get_width() + 10 + trophy_surf.get_width()
-                row_x = 500 - row_width // 2
-                screen.blit(icon, (row_x, cursor))
-                screen.blit(trophy_surf, (row_x + icon.get_width() + 10, cursor + (icon.get_height() - trophy_surf.get_height()) // 2))
-                cursor += icon.get_height() + 12
+                trophy_row = pygame.Surface((icon.get_width() + 10 + trophy_surf.get_width(),
+                                             max(icon.get_height(), trophy_surf.get_height())),
+                                            pygame.SRCALPHA)
+                trophy_row.blit(icon, (0, 0))
+                trophy_row.blit(trophy_surf, (icon.get_width() + 10,
+                                              (icon.get_height() - trophy_surf.get_height()) // 2))
+                rows.append((trophy_row, 12))
             # Both records on one line - there isn't room for a stacked pair
             # alongside everything above
             records_text = "   ".join(label + ": " + value for label, value in recordRows())
-            records_surf = space_font.render(records_text, True, (224, 185, 9))
-            screen.blit(records_surf, (500 - records_surf.get_width() // 2, cursor))
-            cursor += records_surf.get_height() + 12
+            rows.append((space_font.render(records_text, True, (224, 185, 9)), 12))
             controls = "R: Play Again    "
             if reached_goal and has_next:
                 controls += "N: Next Level    "
             controls += "M: Menu"
-            controls_surf = points_font.render(controls, True, (220, 220, 220))
-            screen.blit(controls_surf, (500 - controls_surf.get_width() // 2, cursor))
+            rows.append((points_font.render(controls, True, (220, 220, 220)), 0))
+
+            # Squeeze the gaps, never the rows: text stays full size and
+            # readable, the breathing room is what gives way
+            TOP, BOTTOM = 15, 5
+            content = sum(surf.get_height() for surf, _ in rows)
+            wanted = sum(gap for _, gap in rows)
+            room = 600 - TOP - BOTTOM - content
+            squeeze = 1.0 if wanted <= room else max(room, 0) / wanted
+            cursor = TOP
+            for surf, gap in rows:
+                screen.blit(surf, (500 - surf.get_width() // 2, cursor))
+                cursor += surf.get_height() + int(gap * squeeze)
         else:
             screen.blit(space_font.render("High Scores:", True, (224, 185, 9)), (775, 280))
             for i, (label, value) in enumerate(recordRows()):

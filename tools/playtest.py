@@ -35,8 +35,9 @@ How it works, and why it works this way:
     playtest never touches your real `*Highscore.txt` or
     `AdventureProgress.txt`.
 
-By default every level is starred so any can be picked; --progress sets an
-exact campaign save instead, which is how gated content gets tested. A run
+By default every level is starred and plenty of bonus fish are banked, so
+any level can be picked; --progress and --fish set an exact campaign save
+instead, which is how gated content gets tested. A run
 whose level the select refuses reports LOCKED rather than playing something
 else, so "this should not be reachable yet" is a checkable claim.
 
@@ -94,7 +95,7 @@ class Playtest:
 
     def __init__(self, level_index=0, mode_index=1, shots_dir=None,
                  seed=1234, invincible=False, max_flips=12000, unlock=True,
-                 progress=None, stop_at=None):
+                 progress=None, stop_at=None, fish=None):
         self.level_index = level_index      # 0-based, into mode["levels"]
         self.mode_index = mode_index        # 0-based, into MODES
         self.shots_dir = shots_dir
@@ -103,12 +104,13 @@ class Playtest:
         self.max_flips = max_flips
         self.unlock = unlock                # pre-star the campaign
         self.progress = progress            # explicit star counts instead
+        self.fish = fish                    # explicit bonus-fish total
         self.stop_at = stop_at              # quit once this screen is shown
         self.stopped_at = None
         self.refused = None                 # level name the select refused
         self.g = {}                         # main.py's globals, after exec
         self.flips = 0
-        self.menu_keys_sent = 0
+        self.menu_step = {}                 # screen name -> keys sent there
         self.held = set()
         self.screen_flips = {}              # screen name -> frames seen
         self.shot_screens = []              # screens in the order first seen
@@ -146,28 +148,28 @@ class Playtest:
 
     def driveMenus(self, screen_name):
         """One keypress per flip: the screen functions drain the event queue
-        once per frame, so batching presses would drop all but the last."""
+        once per frame, so batching presses would drop all but the last.
+
+        Each screen counts its own keypresses. They used to share one
+        counter, and the level select's leaked into the instructions menu -
+        which silently stopped every playtest from visiting Level Info."""
+        sent = self.menu_step.get(screen_name, 0)
         if screen_name == "info":
             self.press(pygame.K_RETURN)      # ENTER starts the level from here
-            return
-        if screen_name == "start":
-            if self.menu_keys_sent < self.mode_index:
+        elif screen_name == "start":
+            if sent < self.mode_index:
                 self.press(pygame.K_DOWN)
-                self.menu_keys_sent += 1
             else:
                 self.press(pygame.K_RETURN)
-                self.menu_keys_sent = 0
         elif screen_name == "levels":
-            if self.menu_keys_sent < self.level_index:
+            if sent < self.level_index:
                 self.press(pygame.K_DOWN)
-                self.menu_keys_sent += 1
-            elif self.menu_keys_sent == self.level_index:
+            elif sent == self.level_index:
                 self.press(pygame.K_RETURN)      # exactly one confirm
-                self.menu_keys_sent += 1
             else:
                 # Confirming would have left this screen on the very next
                 # frame. Still here means the row refused: it is locked, or
-                # it is a bonus level whose stars have not been earned
+                # it is a bonus level whose requirement is unmet
                 self.refused = self.g["mode"]["levels"][self.level_index]["name"]
                 self.reached_end = True
         elif screen_name == "instructions":
@@ -175,12 +177,11 @@ class Playtest:
             # so a playtest sees the legend and records for the level it is
             # about to play - that page is where a new level's animal table
             # shows up wrong
-            if self.menu_keys_sent == 0 and not self.seen_info:
+            if sent == 0 and not self.seen_info:
                 self.press(pygame.K_DOWN)
-                self.menu_keys_sent = 1
             else:
                 self.press(pygame.K_RETURN)
-                self.menu_keys_sent = 0
+        self.menu_step[screen_name] = sent + 1
 
     # --- playing the level ---
 
@@ -224,11 +225,15 @@ class Playtest:
                 if a.y > 900:                      # collected, parked offscreen
                     continue
                 effect = level["animals"][a.image_name]["effect"]
-                if effect not in ("points", "shield"):
+                if effect not in ("points", "shield", "bonus"):
                     continue
                 if a.x < -100 or a.x > 1000:
                     continue
                 value = level["animals"][a.image_name].get("value") or 3
+                # A bonus fish is worth crossing the field for - it is the
+                # only thing on it that unlocks a level
+                if effect == "bonus":
+                    value = 40
                 # Prefer close and valuable; distance dominates
                 cost = abs(a.x - px) + abs(a.y - py) - value * 8
                 if best is None or cost < best:
@@ -336,6 +341,11 @@ class Playtest:
             # Star every level so the level select lets us pick any of them
             with open("AdventureProgress.txt", "w") as f:
                 f.write(" ".join(["3"] * 30) + "\n")
+        # Fish-gated levels need fish, not stars, so the default unlock has
+        # to hand out both or --all could never reach one
+        with open("FishFound.txt", "w") as f:
+            f.write(str(self.fish if self.fish is not None
+                        else (0 if self.progress is not None else 99)))
 
         self.patchClock()
         self.patchKeys()
@@ -398,6 +408,9 @@ class Playtest:
             "landmark_cleared": g.get("landmark_cleared"),
             "landmark_crashed": g.get("landmark_crashed"),
             "records": records,
+            "fish": (open(os.path.join(workdir, "FishFound.txt")).read().strip()
+                     if os.path.exists(os.path.join(workdir, "FishFound.txt"))
+                     else "0"),
         }
 
 
@@ -427,7 +440,8 @@ def describe(result):
         elif not result["landmark_spawned"]:
             lines.append("    (round ended before the landmark was due - "
                          "use --invincible to test it)")
-    lines.append("    records file: %s" % result["records"])
+    lines.append("    records file: %s   bonus fish banked: %s"
+                 % (result["records"], result["fish"]))
     if not ok:
         lines.append("    ! never reached the end screen (%d frames)"
                      % result["flips"])
@@ -452,6 +466,9 @@ def main(argv=None):
                         help="exact campaign save to start from, e.g. "
                              "\"2 2 2 2 2 0\" - by default every level is "
                              "starred so any of them can be picked")
+    parser.add_argument("--fish", type=int, metavar="N",
+                        help="bonus fish already found (default: none when "
+                             "--progress is given, plenty otherwise)")
     parser.add_argument("--stop-at", metavar="SCREEN", dest="stop_at",
                         choices=("start", "levels", "instructions", "info"),
                         help="screenshot this menu and quit, without playing")
@@ -488,7 +505,7 @@ def main(argv=None):
         test = Playtest(level_index=index, mode_index=mode_index,
                         shots_dir=shots, seed=args.seed,
                         invincible=args.invincible, progress=args.progress,
-                        stop_at=args.stop_at)
+                        stop_at=args.stop_at, fish=args.fish)
         result = test.run(workdir)
         results.append(result)
         print(describe(result))

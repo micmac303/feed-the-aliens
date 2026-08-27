@@ -134,6 +134,7 @@ dmypy.json
 # its own highscore file (Highscore.txt, UKHighscore.txt, FranceHighscore.txt, ...)
 *Highscore.txt
 AdventureProgress.txt
+FishFound.txt
 
 # macOS
 .DS_Store
