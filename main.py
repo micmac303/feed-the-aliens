@@ -15,8 +15,10 @@ sounds.init()
 # land exactly on the refresh cadence. Pacing with a timer instead (the old
 # clock.tick) drifts against the refresh rate and skips a frame roughly once
 # a second - visible as the whole field jumping forward. SCALED is required
-# for vsync in pygame-ce; the window looks the same.
-screen = pygame.display.set_mode((1000, 600), pygame.SCALED, vsync=1)
+# for vsync in pygame-ce; the window looks the same. SCALED also means the
+# game always draws to a 1000x600 canvas that pygame stretches to the window,
+# so RESIZABLE and fullscreen change only how big it looks, never the layout.
+screen = pygame.display.set_mode((1000, 600), pygame.SCALED | pygame.RESIZABLE, vsync=1)
 pygame.display.set_icon(pygame.image.load("images/006-ufo-1.png"))
 pygame.display.set_caption("Feed The Aliens")
 
@@ -30,6 +32,22 @@ space_font = pygame.font.SysFont("impact", 40)
 title_font = pygame.font.SysFont("impact", 90)
 
 clock = pygame.time.Clock()
+
+# F toggles fullscreen on every screen. Not F11: macOS takes it for Show
+# Desktop, which hides the window and steals keyboard focus mid-round.
+FULLSCREEN_KEYS = (pygame.K_f,)
+
+
+def screenEvents():
+    """pygame.event.get() for the screen loops, minus the fullscreen toggle,
+    which is handled here so every screen gets it without its own copy."""
+    events = []
+    for event in pygame.event.get():
+        if event.type == pygame.KEYDOWN and event.key in FULLSCREEN_KEYS:
+            pygame.display.toggle_fullscreen()
+        else:
+            events.append(event)
+    return events
 
 # Per-round state (the players list, animals, rng, scores, ...) is created by
 # newRound() below, so each starting value is written in exactly one place.
@@ -1069,7 +1087,7 @@ def runStartScreen():
             screen.blit(tagline_font.render(m["tagline"], True, color), (360, 248 + i * 110))
         screen.blit(ufo1, (500 - 128 - 24, 455))
         screen.blit(ufo2, (500 + 24, 455))
-        for event in pygame.event.get():
+        for event in screenEvents():
             if event.type == pygame.QUIT:
                 return "quit"
             if event.type == pygame.KEYDOWN:
@@ -1173,7 +1191,7 @@ def runLevelSelect():
             else:
                 for star in range(progress[i]):
                     screen.blit(star_img, (trail_x + star * 34, trail_y))
-        for event in pygame.event.get():
+        for event in screenEvents():
             if event.type == pygame.QUIT:
                 return "quit"
             if event.type == pygame.KEYDOWN:
@@ -1272,7 +1290,7 @@ def runInstructions():
             cursor += item.get_height() + 6
         prompt = points_font.render("ESC to go back", True, (199, 199, 199))
         screen.blit(prompt, (500 - prompt.get_width() // 2, cursor + 8))
-        for event in pygame.event.get():
+        for event in screenEvents():
             if event.type == pygame.QUIT:
                 return "quit"
             if event.type == pygame.KEYDOWN:
@@ -1343,7 +1361,7 @@ def runLevelInfo():
                 screen.blit(value_surf, (985 - value_surf.get_width(), row_y))
         prompt = points_font.render("Enter to start, ESC to go back", True, (199, 199, 199))
         screen.blit(prompt, (500 - prompt.get_width() // 2, 550))
-        for event in pygame.event.get():
+        for event in screenEvents():
             if event.type == pygame.QUIT:
                 return "quit"
             if event.type == pygame.KEYDOWN:
@@ -1468,11 +1486,16 @@ def runGame():
         if paused:
             banner = space_font.render("PAUSED - P to resume, R to restart, ESC for main menu", True, (199, 199, 199))
             screen.blit(banner, (500 - banner.get_width() // 2, 280))
-        for event in pygame.event.get():
+        for event in screenEvents():
             if event.type == pygame.QUIT:
                 sounds.stop_hum()
                 time.sleep(0.2)
                 return "quit"
+            # Losing the window (another app, Show Desktop, a notification)
+            # takes the keyboard with it, so pause rather than let the clock
+            # run on with the UFO out of control. Resuming is still P.
+            if event.type == pygame.WINDOWFOCUSLOST:
+                paused = True
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_p:
                     paused = not paused
@@ -1710,7 +1733,7 @@ def runEndScreen():
                 sounds.play("jingle_lose")
             else:
                 sounds.play("jingle_win")
-        for event in pygame.event.get():
+        for event in screenEvents():
             if event.type == pygame.QUIT:
                 return "quit"
             if event.type == pygame.KEYDOWN:
