@@ -45,6 +45,15 @@ eaten (or several of these); whether hazards and the shield get a marker
 too (e.g. red for deadly); whether it's always on or an Adventure/easy-
 level helper. The legend already lives on the Level Info page.
 
+**Package as a standalone app** (so it runs without Python installed).
+Likely PyInstaller (or pygbag for a browser build). Things to sort out:
+asset paths and the `*Highscore.txt`/progress files are relative to the
+working directory, which breaks inside a bundle - assets need resolving
+from the bundle, and save files need a per-user folder; builds are
+per-platform (a Mac build makes a .app, Windows needs building on
+Windows); an unsigned Mac app trips Gatekeeper's warning.
+
+## Older ideas
 
 - Flash the score
 - Pic of animals eaten / counter of animals
