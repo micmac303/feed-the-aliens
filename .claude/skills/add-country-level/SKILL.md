@@ -46,7 +46,9 @@ levels comparable:
 - 5 points: a common national animal
 - 10 points: a rare, fast, far-recycling animal (`speed`/`recycle_x`)
 - deadly: the jet in the top half (`y_range`), a national road/rail vehicle
-  in the bottom half
+  in the bottom half. **Both set `speed` from the difficulty curve** (see
+  the comment above `UK_LEVEL`): a new level takes the next step up from
+  the level before it, not a copy of whatever level you cloned
 - the single-use shield in the rare pool
 
 Take the palette from the flag: `background_color`, `score_color` and

@@ -294,6 +294,15 @@ CLASSIC_LEVEL = {
     ],
 }
 
+# The difficulty curve: each level sets its two hazards' speed by hand, and
+# they climb through the campaign - jet / ground vehicle:
+#   UK 7/4, France 8/4, Italy 9/5, Spain 10/5, Germany 11/6,
+#   Ireland 12/6, Poland 13/7, Mediterranean 14/7
+# The bonus and secret levels sit at the top because they are unlocked by
+# mastery. A faster hazard also comes round more often (it reaches its
+# recycle_x sooner), so speed and frequency rise together. Time limit, goal
+# and lives deliberately stay the same everywhere so stars stay comparable.
+
 # Level 1 of the Adventure world tour. All art is the real UK set.
 UK_LEVEL = {
     "name": "Level 1 - United Kingdom",
@@ -326,9 +335,9 @@ UK_LEVEL = {
         "images/swan.png": {"effect": "points", "value": 10, "legend": "Swan +10",
                             "speed": 10, "recycle_x": 3200},
         "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+                           "speed": 7, "recycle_x": 3200, "y_range": (120, 310)},
         "images/bus.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "y_range": (310, 500)},
+                           "speed": 4, "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/fox.png",
@@ -368,9 +377,9 @@ FRANCE_LEVEL = {
         "images/cockerel.png": {"effect": "points", "value": 10, "legend": "Cockerel +10",
                             "speed": 10, "recycle_x": 3200},
         "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+                           "speed": 8, "recycle_x": 3200, "y_range": (120, 310)},
         "images/paris-tram.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "y_range": (310, 500)},
+                           "speed": 4, "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/boar.png",
@@ -410,9 +419,9 @@ ITALY_LEVEL = {
         "images/sparrow.png": {"effect": "points", "value": 10, "legend": "Sparrow +10",
                             "speed": 10, "recycle_x": 3200},
         "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+                           "speed": 9, "recycle_x": 3200, "y_range": (120, 310)},
         "images/rome-bus.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "y_range": (310, 500)},
+                           "speed": 5, "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/wolf.png", "images/boar.png",
@@ -452,9 +461,9 @@ SPAIN_LEVEL = {
         "images/001-eagle.png": {"effect": "points", "value": 10, "legend": "Eagle +10",
                                  "speed": 10, "recycle_x": 3200},
         "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+                           "speed": 10, "recycle_x": 3200, "y_range": (120, 310)},
         "images/spain-train.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "y_range": (310, 500)},
+                           "speed": 5, "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/bull.png",
@@ -495,9 +504,9 @@ GERMANY_LEVEL = {
         "images/alsatian.png": {"effect": "points", "value": 10, "legend": "Alsatian +10",
                             "speed": 10, "recycle_x": 3200},
         "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+                           "speed": 11, "recycle_x": 3200, "y_range": (120, 310)},
         "images/002-truck.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "y_range": (310, 500)},
+                           "speed": 6, "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/boar.png",
@@ -543,7 +552,7 @@ IRELAND_LEVEL = {
         "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
                            "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
         "images/002-truck.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "y_range": (310, 500)},
+                           "speed": 6, "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/fox.png",
@@ -588,9 +597,9 @@ POLAND_LEVEL = {
         "images/beaver.png": {"effect": "points", "value": 10, "legend": "Beaver +10",
                             "speed": 10, "recycle_x": 3200},
         "images/jet-fighter.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+                           "speed": 13, "recycle_x": 3200, "y_range": (120, 310)},
         "images/paris-tram.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "y_range": (310, 500)},
+                           "speed": 7, "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/hedgehog.png", "images/squirrel.png", "images/wolf.png",
@@ -633,9 +642,9 @@ MEDITERRANEAN_LEVEL = {
         "images/octopus.png": {"effect": "points", "value": 10, "legend": "Octopus +10",
                             "speed": 10, "recycle_x": 3200},
         "images/battleship.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "speed": 12, "recycle_x": 3200, "y_range": (120, 310)},
+                           "speed": 14, "recycle_x": 3200, "y_range": (120, 310)},
         "images/submarine.png": {"effect": "deadly", "value": None, "legend": "-1 life",
-                           "y_range": (310, 500)},
+                           "speed": 7, "y_range": (310, 500)},
         "images/shield.png": {"effect": "shield", "value": None, "legend": "Single use shield"},
     },
     "animal_images": ["images/fish.png", "images/shark.png", "images/turtle.png",
