@@ -5,7 +5,7 @@
 The per-level hazard speed curve is done (see the comment above
 `UK_LEVEL` in main.py). Later ideas: jets speeding up during a level as the clock runs down;
 tuning time/goal/lives/spawn mix per level; tanks as a late-game hazard
-(needs art); remembering the fullscreen setting.
+(needs art).
 
 ## Also wanted (2026-10-07, not designed yet - grill first)
 
@@ -15,14 +15,8 @@ records? just stars?); how it's reached (hidden key combo on the start
 screen vs a visible menu item) and whether it needs protecting from
 accidental use (a confirm step, a password - `security.py` is an old
 unfinished login prototype); whether Speed Run's `Highscore.txt` is
-included.
-
-**Show each animal's points value on the field.** Open questions: which
-style - a small number badge on/next to the sprite, a coloured ring or
-glow per value tier, sizing sprites by value, or a "+5" pop-up when one is
-eaten (or several of these); whether hazards and the shield get a marker
-too (e.g. red for deadly); whether it's always on or an Adventure/easy-
-level helper. The legend already lives on the Level Info page.
+included. Decided already: it clears progress, never `Settings.txt`
+(badges and fullscreen are preferences, not progress).
 
 **Package as a standalone app** (so it runs without Python installed).
 Likely PyInstaller (or pygbag for a browser build). Things to sort out:

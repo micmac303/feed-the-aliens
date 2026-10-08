@@ -44,10 +44,55 @@ def screenEvents():
     events = []
     for event in pygame.event.get():
         if event.type == pygame.KEYDOWN and event.key in FULLSCREEN_KEYS:
-            pygame.display.toggle_fullscreen()
+            toggleFullscreen()
+            settings["fullscreen"] = bool(pygame.display.is_fullscreen())
+            saveSettings()
         else:
             events.append(event)
     return events
+
+
+# Player preferences that outlive a session - display choices, not progress,
+# so a future progress reset leaves them alone. One "name on|off" pair per
+# line in a gitignored file; a missing, corrupt or partial file just falls
+# back to the defaults below, the same way the records and star files do
+SETTINGS_FILE = "Settings.txt"
+DEFAULT_SETTINGS = {"badges": True, "fullscreen": False}
+
+
+def loadSettings():
+    loaded = dict(DEFAULT_SETTINGS)
+    try:
+        with open(SETTINGS_FILE, "r") as settings_file:
+            for line in settings_file:
+                parts = line.split()
+                if len(parts) == 2 and parts[0] in loaded and parts[1] in ("on", "off"):
+                    loaded[parts[0]] = parts[1] == "on"
+    except OSError:
+        pass
+    return loaded
+
+
+def saveSettings():
+    with open(SETTINGS_FILE, "w") as settings_file:
+        for name, value in settings.items():
+            settings_file.write(name + (" on\n" if value else " off\n"))
+
+
+# Some displays (a headless dummy driver, some Linux setups) refuse to go
+# fullscreen at all. That must never be fatal - a saved "fullscreen on" from
+# another machine would otherwise stop the game starting - so a refusal just
+# leaves the window as it is
+def toggleFullscreen():
+    try:
+        pygame.display.toggle_fullscreen()
+    except pygame.error:
+        pass
+
+
+settings = loadSettings()
+if settings["fullscreen"]:
+    toggleFullscreen()
 
 # Per-round state (the players list, animals, rng, scores, ...) is created by
 # newRound() below, so each starting value is written in exactly one place.
@@ -230,6 +275,13 @@ fish_found = 0
 # them, so a headless server can forward or ignore the same list. Cleared in
 # newRound() so a fresh round never replays a dead round's leftovers.
 sound_events = []
+
+# Pop-up events, the same idea for the floating "+N" text: the sim appends
+# (kind, value, x, y) - kind is "points", "shield" or "bonus", x/y the
+# collecting UFO's centre - and runGame() drains them into pop-ups. Whether
+# they are shown at all is a mode rule ("point_hints"), decided there, never
+# here. Cleared in newRound() alongside sound_events
+popup_events = []
 
 # A level is the *content* of a round: the animals table, the spawn pools,
 # the legend layout and the point goal. The modes table further down carries
@@ -699,6 +751,9 @@ MODES = [
      # One level and no campaign, so nothing to remember between sessions
      "progress_file": None,
      "bonus_fish_file": None,
+     # No value badges or score pop-ups - a race between two people who
+     # already know the classic cast
+     "point_hints": False,
      "levels": [CLASSIC_LEVEL]},
     {"name": "Adventure",
      "tagline": "One player - eat your way around the world",
@@ -713,6 +768,9 @@ MODES = [
      "progress_file": "AdventureProgress.txt",
      # Running total of bonus fish found, across every level
      "bonus_fish_file": "FishFound.txt",
+     # Each points animal wears a value badge (B toggles them, remembered in
+     # Settings.txt) and every pickup floats up its "+N" as a pop-up
+     "point_hints": True,
      "levels": ADVENTURE_LEVELS},
 ]
 mode = MODES[0]
@@ -888,6 +946,7 @@ class Player:
 
         if effect == "points":
             self.score += value
+            popup_events.append(("points", value, self.x + 32, self.y))
             # Big hauls (the swan, the eagle) sound richer than +1 blips
             sound_events.append("collect_big" if value >= 5 else "collect")
         elif effect == "obstacle":
@@ -926,10 +985,12 @@ class Player:
             global fish_found
             fish_found += 1
             self.score += value
+            popup_events.append(("bonus", value, self.x + 32, self.y))
             sound_events.append("trophy")
         elif effect == "shield":
             self.shield = True
             sound_events.append("shield_up")
+            popup_events.append(("shield", None, self.x + 32, self.y))
         elif effect == "random":
             if rng.randint(0, 1) == 0:
                 self.score -= value
@@ -1059,6 +1120,7 @@ def newRound(seed=None):
     landmark_crashed = False
 
     sound_events.clear()
+    popup_events.clear()
 
     records = loadRecords(level["highscore_file"])
     trophy = False
@@ -1351,6 +1413,12 @@ def runLevelInfo():
             controls = "   ".join("P" + str(p.number) + ": " + p.controls_text for p in players)
         controls_surf = space_font.render(controls, True, (199, 199, 199))
         screen.blit(controls_surf, (500 - controls_surf.get_width() // 2, cursor))
+        # The badge toggle gets its own smaller line underneath: on the
+        # controls line it ran into the side columns' "+10" labels
+        if mode["point_hints"]:
+            cursor += controls_surf.get_height()
+            hint = points_font.render("B: show/hide value badges", True, (199, 199, 199))
+            screen.blit(hint, (500 - hint.get_width() // 2, cursor))
         # Animal pictures, labelled from the level's animals table so the
         # legend cannot drift out of step with what the animals are worth
         for legend_name, image_at, label_at in level["legend_layout"]:
@@ -1382,11 +1450,79 @@ def runLevelInfo():
                     return "instructions"
 
 
+# Value colours shared by the badges and the pop-ups, so a gold badge pays
+# out a gold "+10". Highest threshold first; a value between tiers takes the
+# tier below it, so a future 3- or 7-pointer still gets a sensible colour
+VALUE_TIERS = [(10, (235, 180, 20)),   # gold - the rare, fast one
+               (5, (40, 110, 220)),    # blue
+               (2, (40, 160, 70)),     # green
+               (1, (130, 130, 130))]   # grey
+SHIELD_POPUP_COLOR = (66, 239, 245)    # the shield's own outline colour
+BONUS_POPUP_COLOR = (255, 105, 180)    # unlike anything else on the field
+POPUP_FRAMES = 30                      # about half a second at 60fps
+POPUP_RISE = 40
+
+badge_font = pygame.font.SysFont("impact", 16)
+popup_font = pygame.font.SysFont("impact", 28)
+
+
+def valueColor(value):
+    for threshold, color in VALUE_TIERS:
+        if value >= threshold:
+            return color
+    return VALUE_TIERS[-1][1]
+
+
+# Text with a dark rim, readable on every level's background - Germany's
+# gold and the UK's white swallow a plain grey or gold number
+def outlinedText(font, text, color, outline=(0, 0, 0), width=2):
+    rim = font.render(text, True, outline)
+    surf = pygame.Surface((rim.get_width() + 2 * width, rim.get_height() + 2 * width), pygame.SRCALPHA)
+    for dx in (-width, 0, width):
+        for dy in (-width, 0, width):
+            if dx or dy:
+                surf.blit(rim, (width + dx, width + dy))
+    surf.blit(font.render(text, True, color), (width, width))
+    return surf
+
+
+# One badge surface per value, built on first use: a coloured disc with a
+# dark rim and the number in white
+badge_cache = {}
+
+
+def badgeSurface(value):
+    if value not in badge_cache:
+        surf = pygame.Surface((26, 26), pygame.SRCALPHA)
+        pygame.draw.circle(surf, (0, 0, 0), (13, 13), 13)
+        pygame.draw.circle(surf, valueColor(value), (13, 13), 11)
+        number = outlinedText(badge_font, str(value), (255, 255, 255), width=1)
+        surf.blit(number, (13 - number.get_width() // 2, 13 - number.get_height() // 2))
+        badge_cache[value] = surf
+    return badge_cache[value]
+
+
+# Turn one sim pop-up event into the text that floats up from it
+def popupSurface(kind, value):
+    if kind == "shield":
+        return outlinedText(popup_font, "Shield!", SHIELD_POPUP_COLOR)
+    if kind == "bonus":
+        return outlinedText(popup_font, "Bonus fish!", BONUS_POPUP_COLOR)
+    return outlinedText(popup_font, "+" + str(value), valueColor(value))
+
+
 def runGame():
     global current_time, last_time
 
     temp = pygame.time.get_ticks()
     paused = False
+    # Floating "+N" texts in flight: [surface, x, y, age in frames]. Local
+    # to the screen - each round is a fresh call, so nothing carries over
+    popups = []
+    # The "Badges on/off" confirmation after B, and when it stops showing.
+    # Real ticks rather than sim frames, so it still fades while paused
+    badge_message = None
+    badge_message_until = 0
     # The engine hum runs for exactly as long as this screen does - every
     # return below stops it
     sounds.start_hum()
@@ -1490,8 +1626,32 @@ def runGame():
             for name in sound_events:
                 sounds.play(name)
             sound_events.clear()
+            # Same for pop-ups - drained every step, shown only where the
+            # mode wants them
+            if mode["point_hints"]:
+                for kind, value, x, y in popup_events:
+                    popups.append([popupSurface(kind, value), x, y, 0])
+            popup_events.clear()
+            for popup in popups:
+                popup[3] += dt
+            popups = [popup for popup in popups if popup[3] < POPUP_FRAMES]
         for animal in animals:
             animal.draw(screen)
+        # Value badges ride the bottom-left corner of every points animal -
+        # never a hazard, the shield or the bonus fish, which stays secret.
+        # Not top right: the animals face right, so a badge there sat on
+        # their heads (it hid the swan's entirely)
+        if mode["point_hints"] and settings["badges"]:
+            for animal in animals:
+                animal_type = level["animals"][animal.image_name]
+                if animal_type["effect"] == "points":
+                    badge = badgeSurface(animal_type["value"])
+                    screen.blit(badge, (animal.x - 6, animal.y + 64 - badge.get_height() + 6))
+        for surf, x, y, age in popups:
+            surf.set_alpha(int(255 * (1 - age / POPUP_FRAMES)))
+            screen.blit(surf, (x - surf.get_width() // 2, y - POPUP_RISE * age / POPUP_FRAMES))
+        if badge_message and pygame.time.get_ticks() < badge_message_until:
+            screen.blit(badge_message, (500 - badge_message.get_width() // 2, 60))
         if paused:
             banner = space_font.render("PAUSED - P to resume, R to restart, ESC for main menu", True, (199, 199, 199))
             screen.blit(banner, (500 - banner.get_width() // 2, 280))
@@ -1509,6 +1669,15 @@ def runGame():
                 if event.key == pygame.K_p:
                     paused = not paused
                     sounds.play("menu_move")
+                # B hides or shows the value badges - for players who know
+                # the cast by now. Works paused too; remembered between runs
+                if event.key == pygame.K_b and mode["point_hints"]:
+                    settings["badges"] = not settings["badges"]
+                    saveSettings()
+                    sounds.play("menu_move")
+                    badge_message = outlinedText(space_font, "Badges " + ("on" if settings["badges"] else "off"),
+                                                 (255, 255, 255))
+                    badge_message_until = pygame.time.get_ticks() + 1000
                 # R restarts the level then and there - no end screen, no
                 # instructions, straight back into a fresh round. Returning
                 # "game" hands back to the dispatch loop, which calls this

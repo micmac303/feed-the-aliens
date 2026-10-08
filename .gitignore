@@ -135,6 +135,8 @@ dmypy.json
 *Highscore.txt
 AdventureProgress.txt
 FishFound.txt
+# Display preferences (badges on/off, fullscreen)
+Settings.txt
 
 # macOS
 .DS_Store
